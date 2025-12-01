@@ -92,7 +92,24 @@
                 <option value="10">10</option>
             </select>
         </div>
+        <div style="margin-top: 10px; pointer-events: auto;">
+            <label for="geometry-select" style="margin-right: 10px;">Geometry:</label>
+            <select id="geometry-select" style="padding: 5px; border-radius: 4px;">
+                <option value="standard" selected>Standard</option>
+                <option value="rounded">Rounded</option>
+                <option value="circle">Circle</option>
+                <option value="diamond">Diamond</option>
+                <option value="heart">Heart</option>
+            </select>
+        </div>
+        <div style="margin-top: 10px; pointer-events: auto;">
+            <div id="coord-display" style="background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px;">
+                X: 0.00 Y: 0.00 Z: 0.00
+            </div>
+        </div>
     </div>
+    <canvas id="shape-canvas" width="150" height="150"
+        style="position: absolute; top: 10px; left: 10px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.5); pointer-events: none; border-radius: 8px;"></canvas>
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -188,7 +205,7 @@
         // scene.fog = new THREE.Fog(0x111111, 10, 50); // Removed fog to prevent darkness at distance
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000); // Increased far plane
-        camera.position.set(10, 10, 10);
+        camera.position.set(32.20, 32.20, 32.20);
         camera.lookAt(0, 0, 0);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -288,41 +305,71 @@
         // --- Domino Management ---
         const dominoes = [];
         const DOMINO_SPACING = 1.0; // Distance between dominoes
+
         let activeDomino = null; // The currently selected domino for adding new ones
+        const selectedDominoes = new Set(); // Track all selected dominoes
 
         // Raycasting for selection
         const raycaster = new THREE.Raycaster();
         const pointer = new THREE.Vector2();
 
-        function createDominoGeometry(width, height, depth, radius) {
+
+
+        function createDominoGeometry(width, height, depth, type) {
             const shape = new THREE.Shape();
             const w = width / 2;
             const h = height / 2;
-            const r = radius;
 
-            // Start bottom-left
-            shape.moveTo(-w, -h);
-            // Bottom edge
-            shape.lineTo(w, -h);
-            // Right edge
-            shape.lineTo(w, h - r);
-            // Top-right corner
-            shape.quadraticCurveTo(w, h, w - r, h);
-            // Top edge
-            shape.lineTo(-w + r, h);
-            // Top-left corner
-            shape.quadraticCurveTo(-w, h, -w, h - r);
-            // Left edge
-            shape.lineTo(-w, -h);
+            if (type === 'circle') {
+                const radius = Math.min(w, h);
+                shape.absarc(0, 1.5 * radius - h, 1.5 * radius, 0, Math.PI * 2);
+            } else if (type === 'diamond') {
+                shape.moveTo(0, h);
+                shape.lineTo(w, 0);
+                shape.lineTo(0, -h);
+                shape.lineTo(-w, 0);
+                shape.lineTo(0, h);
+            } else if (type === 'heart') {
+                // Heart shape logic
+                const x = 0, y = 0;
+                // Scale factor to fit within width/height
+                const s = Math.min(w, h) / 2.5;
+
+                shape.moveTo(x, y + h);
+                shape.bezierCurveTo(x + w, y + h, x + 2.0 * s, y - 1.0 * s, x, y - h);
+                shape.bezierCurveTo(x - 2.0 * s, y - 1.0 * s, x - w, y + h, x, y + h);
+
+                // Center the heart vertically roughly
+                // The above drawing is centered around (0,0) but slightly offset
+            } else {
+                // Standard or Rounded
+                const radius = type === 'rounded' ? 0.5 : 0.1;
+                const r = radius;
+
+                // Start bottom-left
+                shape.moveTo(-w, -h);
+                // Bottom edge
+                shape.lineTo(w, -h);
+                // Right edge
+                shape.lineTo(w, h - r);
+                // Top-right corner
+                shape.quadraticCurveTo(w, h, w - r, h);
+                // Top edge
+                shape.lineTo(-w + r, h);
+                // Top-left corner
+                shape.quadraticCurveTo(-w, h, -w, h - r);
+                // Left edge
+                shape.lineTo(-w, -h);
+            }
 
             const extrudeSettings = {
                 depth: depth,
                 bevelEnabled: false,
-                curveSegments: 12
+                curveSegments: 24 // Increased for smoother curves
             };
 
             const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-            geometry.center();
+            //geometry.center();
 
             // Re-group faces for materials
             // Material 0: Body
@@ -347,8 +394,47 @@
                 // Check normal Y component
                 const ny = normalAttribute.getY(i);
 
+                // For flat shapes like circle/diamond, the top face normal is exactly (0, 0, 1) in local ExtrudeGeometry space before rotation?
+                // Wait, ExtrudeGeometry extrudes along Z by default.
+                // geometry.center() centers it.
+                // We want the face that corresponds to the "front" or "back" of the extrusion to be the "Top" face in our domino context?
+                // In the previous code, we checked ny > 0.9.
+                // Let's verify orientation.
+                // createDominoAt rotates the group.
+                // The mesh is positioned at (0, height/2, -depth/2).
+                // The extrusion happens in Z.
+                // So the large faces are +Z and -Z.
+                // But wait, the previous code had:
+                // shape drawn in XY plane.
+                // Extruded in Z.
+                // Then checked normal Y?
+                // Ah, looking at previous code:
+                // shape.moveTo(-w, -h)...
+                // This draws in XY.
+                // ExtrudeGeometry extrudes along Z.
+                // So the large faces are normal +Z and -Z.
+                // The side faces have normals in XY plane (so Z=0).
+                // Why did the previous code check `ny > 0.9`?
+                // Maybe the geometry was rotated?
+                // "dominoGroup.rotation.order = 'YXZ';"
+                // "dominoMesh.position.set(0, DOMINO_HEIGHT / 2, -DOMINO_DEPTH / 2);"
+                // If I look at the previous code again...
+                // It seems I might have misread or the previous logic relied on something specific.
+                // Let's look at `createDominoGeometry` in previous turn.
+                // It was checking `ny > 0.9`.
+                // If the shape is in XY, and extruded in Z, the top edge (y=+h) has normal (0, 1, 0).
+                // So `ny > 0.9` selects the TOP EDGE face.
+                // The "Top" material (Black) is the one on the "Top" of the domino (highest Y).
+                // Yes, that makes sense. The "Face" of the domino (with dots) is usually the large flat side, but here we are coloring the "Top" (ceiling) of the domino black?
+                // Or is "Top" meaning the face with dots?
+                // "Material 1: Top (Black)"
+                // Dominos usually have black/white dots on the large face.
+                // But the code selects `ny > 0.9`. That is the surface facing UP (+Y).
+                // So it's the "cap" of the domino.
+                // Okay, I will preserve that logic.
+
                 if (ny > 0.9) {
-                    // Top Face
+                    // Top Face (facing +Y)
                     for (let j = 0; j < 3; j++) {
                         topVerts.push(posAttribute.getX(i + j), posAttribute.getY(i + j), posAttribute.getZ(i + j));
                         topNormals.push(normalAttribute.getX(i + j), normalAttribute.getY(i + j), normalAttribute.getZ(i + j));
@@ -379,6 +465,64 @@
             return nonIndexedGeo;
         }
 
+        function drawDominoShape(width, height, type) {
+            const canvas = document.getElementById('shape-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const w = width / 2;
+            const h = height / 2;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Setup scaling and translation to fit in canvas
+            const scale = 50; // 1 unit = 50 pixels
+            const offsetX = canvas.width / 2;
+            const offsetY = canvas.height / 2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.fillStyle = 'rgba(100, 149, 237, 0.5)'; // Cornflower blue with opacity
+
+            // Helper to transform coordinates
+            const tx = (x) => x * scale + offsetX;
+            const ty = (y) => -y * scale + offsetY; // Flip Y for canvas coords
+
+            if (type === 'circle') {
+                const radius = Math.min(w, h);
+                ctx.arc(tx(0), ty(0), 1.5 * radius * scale, 0, Math.PI * 2);
+            } else if (type === 'diamond') {
+                ctx.moveTo(tx(0), ty(h));
+                ctx.lineTo(tx(w), ty(0));
+                ctx.lineTo(tx(0), ty(-h));
+                ctx.lineTo(tx(-w), ty(0));
+                ctx.lineTo(tx(0), ty(h));
+            } else if (type === 'heart') {
+                const x = 0, y = 0;
+                const s = Math.min(w, h) / 2.5;
+
+                ctx.moveTo(tx(x), ty(y + 1.5 * s));
+                ctx.bezierCurveTo(tx(x + 2.5 * s), ty(y + 1.5 * s), tx(x + 2.0 * s), ty(y - 1.0 * s), tx(x), ty(y - 3.0 * s));
+                ctx.bezierCurveTo(tx(x - 2.0 * s), ty(y - 1.0 * s), tx(x - 2.5 * s), ty(y + 1.5 * s), tx(x), ty(y + 1.5 * s));
+            } else {
+                // Standard or Rounded
+                const radius = type === 'rounded' ? 0.5 : 0.1;
+                const r = radius;
+
+                ctx.moveTo(tx(-w), ty(-h));
+                ctx.lineTo(tx(w), ty(-h));
+                ctx.lineTo(tx(w), ty(h - r));
+                ctx.quadraticCurveTo(tx(w), ty(h), tx(w - r), ty(h));
+                ctx.lineTo(tx(-w + r), ty(h));
+                ctx.quadraticCurveTo(tx(-w), ty(h), tx(-w), ty(h - r));
+                ctx.lineTo(tx(-w), ty(-h));
+            }
+
+            ctx.fill();
+            ctx.stroke();
+        }
+
         function createDominoAt(x, z, rotationY = 0) {
             const dominoGroup = new THREE.Group();
             // Ensure rotation order is YXZ so that X-rotation (falling) happens relative to Y-rotation (orientation)
@@ -389,7 +533,8 @@
             scene.add(dominoGroup);
 
             // Use custom rounded geometry
-            const geometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, 0.25);
+            const geoType = document.getElementById('geometry-select').value;
+            const geometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, geoType);
 
             let bodyMaterial;
             if (isRainbowMode) {
@@ -459,7 +604,7 @@
                 const mesh = d.group.children[0];
                 const materials = mesh.material; // Array of materials
 
-                if (d === activeDomino) {
+                if (selectedDominoes.has(d)) {
                     // Active domino: Glow (Yellow-Green) on Body faces
                     // Index 0 is Body, Index 1 is Top
                     if (materials[0]) {
@@ -482,153 +627,223 @@
         // Add initial domino
         const initialDomino = createDomino(0);
         dominoes.push(initialDomino);
+
         activeDomino = initialDomino;
+        selectedDominoes.add(initialDomino);
         updateHighlights();
 
+        // Initial draw of the shape
+        drawDominoShape(DOMINO_WIDTH, DOMINO_HEIGHT, document.getElementById('geometry-select').value);
+
+        // Update shape when geometry changes
+        document.getElementById('geometry-select').addEventListener('change', (e) => {
+            const type = e.target.value;
+            drawDominoShape(DOMINO_WIDTH, DOMINO_HEIGHT, type);
+        });
+
         function addDomino() {
-            if (!activeDomino) return;
+            if (selectedDominoes.size === 0) return;
 
-            for (let i = 0; i < 2; i++) {
-                const last = activeDomino;
-                const lastPos = last.group.position;
-                const lastRot = last.group.rotation.y;
+            const newSelection = new Set();
+            const currentSelection = Array.from(selectedDominoes);
 
-                // Forward vector based on rotation (assuming +Z is forward in local space)
-                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
+            currentSelection.forEach(activeDomino => {
+                let last = activeDomino;
+                for (let i = 0; i < 2; i++) {
+                    const lastPos = last.group.position;
+                    const lastRot = last.group.rotation.y;
 
-                const newPos = lastPos.clone().add(forward.multiplyScalar(DOMINO_SPACING));
+                    // Forward vector based on rotation (assuming +Z is forward in local space)
+                    const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
 
-                const newDomino = createDominoAt(newPos.x, newPos.z, lastRot);
-                dominoes.push(newDomino);
+                    const newPos = lastPos.clone().add(forward.multiplyScalar(DOMINO_SPACING));
 
-                // Connect graph
-                last.children.push(newDomino);
+                    const newDomino = createDominoAt(newPos.x, newPos.z, lastRot);
+                    dominoes.push(newDomino);
 
-                // Advance active domino
-                activeDomino = newDomino;
+                    // Connect graph
+                    last.children.push(newDomino);
+
+                    last = newDomino;
+                }
+                newSelection.add(last);
+            });
+
+            selectedDominoes.clear();
+            newSelection.forEach(d => selectedDominoes.add(d));
+
+            // Update activeDomino to one of the new ones (e.g. the last one added)
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
             }
+
             updateHighlights();
         }
 
         function turnLeft() {
-            if (!activeDomino) return;
+            if (selectedDominoes.size === 0) return;
 
-            const last = activeDomino;
-            const lastPos = last.group.position;
-            const lastRot = last.group.rotation.y;
-
-            // const radius = 2;
+            const newSelection = new Set();
+            const currentSelection = Array.from(selectedDominoes);
             const radius = parseInt(document.getElementById('radius-select').value, 10);
-            // Left Turn: Center is to the Left (+X in local space relative to Forward +Z)
-            // Local Left is (1, 0, 0)
-            const left = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
-            const center = lastPos.clone().add(left.clone().multiplyScalar(radius));
 
-            // Current Angle relative to Center
-            // Vector from Center to LastPos = -Left * Radius
-            // We want to rotate this vector CCW (Left Turn) around Y axis
-            const startVec = lastPos.clone().sub(center);
+            currentSelection.forEach(activeDomino => {
+                const last = activeDomino;
+                const lastPos = last.group.position;
+                const lastRot = last.group.rotation.y;
 
-            const angles = [];
-            for (let n = 1; n <= radius + 1; n++) {
-                angles.push(n * 90 / (radius + 1));
+                // Left Turn: Center is to the Left (+X in local space relative to Forward +Z)
+                // Local Left is (1, 0, 0)
+                const left = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
+                const center = lastPos.clone().add(left.clone().multiplyScalar(radius));
+
+                // Current Angle relative to Center
+                // Vector from Center to LastPos = -Left * Radius
+                // We want to rotate this vector CCW (Left Turn) around Y axis
+                const startVec = lastPos.clone().sub(center);
+
+                const angles = [];
+                for (let n = 1; n <= radius + 1; n++) {
+                    angles.push(n * 90 / (radius + 1));
+                }
+
+                let currentParent = last;
+
+                angles.forEach(deg => {
+                    const rad = deg * (Math.PI / 180);
+
+                    // Rotate startVec by 'rad' around Y axis (CCW)
+                    const newVec = startVec.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rad);
+                    const newPos = center.clone().add(newVec);
+
+                    // New Rotation: Last Rotation + rad
+                    const newRot = lastRot + rad;
+
+                    const newDomino = createDominoAt(newPos.x, newPos.z, newRot);
+                    dominoes.push(newDomino);
+
+                    // Connect graph
+                    currentParent.children.push(newDomino);
+                    currentParent = newDomino;
+                });
+                newSelection.add(currentParent);
+            });
+
+            selectedDominoes.clear();
+            newSelection.forEach(d => selectedDominoes.add(d));
+
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
             }
 
-            let currentParent = last;
-
-            angles.forEach(deg => {
-                const rad = deg * (Math.PI / 180);
-
-                // Rotate startVec by 'rad' around Y axis (CCW)
-                const newVec = startVec.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rad);
-                const newPos = center.clone().add(newVec);
-
-                // New Rotation: Last Rotation + rad
-                const newRot = lastRot + rad;
-
-                const newDomino = createDominoAt(newPos.x, newPos.z, newRot);
-                dominoes.push(newDomino);
-
-                // Connect graph
-                currentParent.children.push(newDomino);
-                currentParent = newDomino;
-            });
-            activeDomino = currentParent;
             updateHighlights();
         }
 
         function turnRight() {
-            if (!activeDomino) return;
+            if (selectedDominoes.size === 0) return;
 
-            const last = activeDomino;
-            const lastPos = last.group.position;
-            const lastRot = last.group.rotation.y;
-
+            const newSelection = new Set();
+            const currentSelection = Array.from(selectedDominoes);
             const radius = parseInt(document.getElementById('radius-select').value, 10);
-            // Right Turn: Center is to the Right (-X relative to Forward)
-            // Local Right is (-1, 0, 0)
-            const right = new THREE.Vector3(-1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
-            const center = lastPos.clone().add(right.clone().multiplyScalar(radius));
 
-            // Vector from Center to LastPos
-            const startVec = lastPos.clone().sub(center);
+            currentSelection.forEach(activeDomino => {
+                const last = activeDomino;
+                const lastPos = last.group.position;
+                const lastRot = last.group.rotation.y;
 
-            const angles = [];
-            for (let n = 1; n <= radius + 1; n++) {
-                angles.push(n * 90 / (radius + 1));
+                // Right Turn: Center is to the Right (-X relative to Forward)
+                // Local Right is (-1, 0, 0)
+                const right = new THREE.Vector3(-1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
+                const center = lastPos.clone().add(right.clone().multiplyScalar(radius));
+
+                // Vector from Center to LastPos
+                const startVec = lastPos.clone().sub(center);
+
+                const angles = [];
+                for (let n = 1; n <= radius + 1; n++) {
+                    angles.push(n * 90 / (radius + 1));
+                }
+
+                let currentParent = last;
+
+                angles.forEach(deg => {
+                    const rad = deg * (Math.PI / 180);
+
+                    // Rotate startVec by '-rad' (CW) to go Forward along the circle
+                    const newVec = startVec.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -rad);
+                    const newPos = center.clone().add(newVec);
+
+                    // New Rotation: Last Rotation - rad (CW turn)
+                    const newRot = lastRot - rad;
+
+                    const newDomino = createDominoAt(newPos.x, newPos.z, newRot);
+                    dominoes.push(newDomino);
+
+                    // Connect graph
+                    currentParent.children.push(newDomino);
+                    currentParent = newDomino;
+                });
+                newSelection.add(currentParent);
+            });
+
+            selectedDominoes.clear();
+            newSelection.forEach(d => selectedDominoes.add(d));
+
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
             }
 
-            let currentParent = last;
-
-            angles.forEach(deg => {
-                const rad = deg * (Math.PI / 180);
-
-                // Rotate startVec by '-rad' (CW) to go Forward along the circle
-                const newVec = startVec.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -rad);
-                const newPos = center.clone().add(newVec);
-
-                // New Rotation: Last Rotation - rad (CW turn)
-                const newRot = lastRot - rad;
-
-                const newDomino = createDominoAt(newPos.x, newPos.z, newRot);
-                dominoes.push(newDomino);
-
-                // Connect graph
-                currentParent.children.push(newDomino);
-                currentParent = newDomino;
-            });
-            activeDomino = currentParent;
             updateHighlights();
         }
 
         function splitTwoWay() {
-            if (!activeDomino) return;
+            if (selectedDominoes.size === 0) return;
 
-            const last = activeDomino;
-            const lastPos = last.group.position;
-            const lastRot = last.group.rotation.y;
+            const newSelection = new Set();
+            const currentSelection = Array.from(selectedDominoes);
 
-            // Forward vector
-            const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
-            // Right vector
-            const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
+            currentSelection.forEach(activeDomino => {
+                const last = activeDomino;
+                const lastPos = last.group.position;
+                const lastRot = last.group.rotation.y;
 
-            const splitGap = 0.6; // Half of the gap between the two new dominoes
+                // Forward vector
+                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
+                // Right vector
+                const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
 
-            // Position 1: Left
-            const pos1 = lastPos.clone().add(forward.clone().multiplyScalar(DOMINO_SPACING)).sub(right.clone().multiplyScalar(splitGap));
-            const domino1 = createDominoAt(pos1.x, pos1.z, lastRot);
-            dominoes.push(domino1);
-            last.children.push(domino1);
+                const splitGap = 0.6; // Half of the gap between the two new dominoes
 
-            // Position 2: Right
-            const pos2 = lastPos.clone().add(forward.clone().multiplyScalar(DOMINO_SPACING)).add(right.clone().multiplyScalar(splitGap));
-            const domino2 = createDominoAt(pos2.x, pos2.z, lastRot);
-            dominoes.push(domino2);
-            last.children.push(domino2);
+                // Position 1: Left
+                const pos1 = lastPos.clone().add(forward.clone().multiplyScalar(DOMINO_SPACING)).sub(right.clone().multiplyScalar(splitGap));
+                const domino1 = createDominoAt(pos1.x, pos1.z, lastRot);
+                dominoes.push(domino1);
+                last.children.push(domino1);
+                newSelection.add(domino1);
 
-            // Set active domino to the Right one (arbitrary choice to allow continuation)
-            activeDomino = domino2;
+                // Position 2: Right
+                const pos2 = lastPos.clone().add(forward.clone().multiplyScalar(DOMINO_SPACING)).add(right.clone().multiplyScalar(splitGap));
+                const domino2 = createDominoAt(pos2.x, pos2.z, lastRot);
+                dominoes.push(domino2);
+                last.children.push(domino2);
+                newSelection.add(domino2);
+            });
+
+            selectedDominoes.clear();
+            newSelection.forEach(d => selectedDominoes.add(d));
+
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
+            }
+
             updateHighlights();
         }
 
@@ -667,6 +882,13 @@
             });
 
             controls.update();
+
+            // Update coordinate display
+            const coordDisplay = document.getElementById('coord-display');
+            if (coordDisplay) {
+                coordDisplay.textContent = `X: ${camera.position.x.toFixed(2)} Y: ${camera.position.y.toFixed(2)} Z: ${camera.position.z.toFixed(2)}`;
+            }
+
             renderer.render(scene, camera);
         }
 
@@ -831,8 +1053,34 @@
             for (let i = 0; i < intersects.length; i++) {
                 const object = intersects[i].object;
                 // Check if the object is part of a domino
+                // Check if the object is part of a domino
                 if (object.userData.domino) {
-                    activeDomino = object.userData.domino;
+                    const clickedDomino = object.userData.domino;
+
+                    if (event.ctrlKey) {
+                        // Toggle selection
+                        if (selectedDominoes.has(clickedDomino)) {
+                            selectedDominoes.delete(clickedDomino);
+                            // If we deselected the active one, update activeDomino
+                            if (activeDomino === clickedDomino) {
+                                // Set to the last one in the set, or null
+                                if (selectedDominoes.size > 0) {
+                                    activeDomino = Array.from(selectedDominoes).pop();
+                                } else {
+                                    activeDomino = null;
+                                }
+                            }
+                        } else {
+                            selectedDominoes.add(clickedDomino);
+                            activeDomino = clickedDomino;
+                        }
+                    } else {
+                        // Single selection
+                        selectedDominoes.clear();
+                        selectedDominoes.add(clickedDomino);
+                        activeDomino = clickedDomino;
+                    }
+
                     updateHighlights();
                     break; // Stop after finding the first domino
                 }
