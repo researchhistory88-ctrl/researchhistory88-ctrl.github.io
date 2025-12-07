@@ -80,17 +80,18 @@
         <div style="margin-top: 10px; pointer-events: auto;">
             <label for="radius-select" style="margin-right: 10px;">Turn Radius:</label>
             <select id="radius-select" style="padding: 5px; border-radius: 4px;">
-                <!-- Options 2 through 10 -->
-                <option value="2" selected>2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
-                <option value="7">7</option>
-                <option value="8">8</option>
-                <option value="9">9</option>
-                <option value="10">10</option>
+                <!-- Options will be populated by script -->
             </select>
+            <script>
+                const radiusSelect = document.getElementById('radius-select');
+                for (let i = 2; i <= 30; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = i;
+                    if (i === 2) option.selected = true;
+                    radiusSelect.appendChild(option);
+                }
+            </script>
         </div>
         <div style="margin-top: 10px; pointer-events: auto;">
             <label for="geometry-select" style="margin-right: 10px;">Geometry:</label>
@@ -103,16 +104,373 @@
             </select>
         </div>
         <div style="margin-top: 10px; pointer-events: auto;">
+            <label for="n-way-select" style="margin-right: 10px;">N-Way:</label>
+            <select id="n-way-select" style="padding: 5px; border-radius: 4px;">
+                <!-- Options 2 to 10 -->
+                <option value="2" selected>2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+            </select>
+        </div>
+        <div style="margin-top: 10px; pointer-events: auto;">
+            <label for="color-picker" style="margin-right: 10px;">Color:</label>
+            <input type="color" id="color-picker" value="#ff6b6b"
+                style="padding: 0; border: none; border-radius: 4px; height: 30px; width: 50px;">
+        </div>
+        <div style="margin-top: 10px; pointer-events: auto;">
             <div id="coord-display" style="background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px;">
                 X: 0.00 Y: 0.00 Z: 0.00
             </div>
         </div>
     </div>
+
+    <!-- History Log -->
+    <div id="history-log" style="
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 300px;
+        max-height: 400px;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 14px;
+        pointer-events: auto;
+        z-index: 100;
+    ">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+            <h3 style="margin: 0;">History</h3>
+            <div>
+                <input type="file" id="import-file" style="display: none;" accept=".txt">
+                <button id="import-btn" style="
+                    padding: 4px 8px;
+                    font-size: 12px;
+                    background: #28a745;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    margin-right: 5px;
+                ">Import</button>
+                <button id="export-btn" style="
+                    padding: 4px 8px;
+                    font-size: 12px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                ">Export</button>
+            </div>
+        </div>
+        <div id="replay-controls"
+            style="display: none; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid #eee;">
+            <button id="step-btn" style="
+                padding: 4px 8px;
+                font-size: 12px;
+                background: #ffc107;
+                color: #333;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                width: 100%;
+            ">Step</button>
+            <div id="replay-status" style="font-size: 12px; color: #666; text-align: center; margin-top: 5px;"></div>
+        </div>
+        <div id="log-content"></div>
+    </div>
+
     <canvas id="shape-canvas" width="150" height="150"
         style="position: absolute; top: 10px; left: 10px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.5); pointer-events: none; border-radius: 8px;"></canvas>
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Logging Helper ---
+        function logAction(message) {
+            const logContent = document.getElementById('log-content');
+            const entry = document.createElement('div');
+            entry.style.marginBottom = '5px';
+            entry.style.borderBottom = '1px solid #eee';
+            entry.style.paddingBottom = '2px';
+
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span style="color: #888; font-size: 12px;">[${time}]</span> ${message}`;
+
+            logContent.appendChild(entry);
+
+            // Auto-scroll to bottom
+            const logContainer = document.getElementById('history-log');
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // --- Export Helper ---
+        document.getElementById('export-btn').addEventListener('click', () => {
+            const logContent = document.getElementById('log-content');
+            let text = "";
+            // Iterate over children to get text content cleanly
+            for (const child of logContent.children) {
+                text += child.innerText + "\n";
+            }
+
+            if (!text) {
+                alert("No history to export.");
+                return;
+            }
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            a.download = `domino_history_${timestamp}.txt`;
+
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // --- Import and Replay Logic ---
+        let replayQueue = [];
+        let currentReplayIndex = 0;
+
+        const importBtn = document.getElementById('import-btn');
+        const importFile = document.getElementById('import-file');
+        const stepBtn = document.getElementById('step-btn');
+        const replayControls = document.getElementById('replay-controls');
+        const replayStatus = document.getElementById('replay-status');
+
+        importBtn.addEventListener('click', () => {
+            importFile.click();
+        });
+
+        importFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const text = e.target.result;
+                parseLog(text);
+            };
+            reader.readAsText(file);
+        });
+
+        function parseLog(text) {
+            replayQueue = [];
+            currentReplayIndex = 0;
+            const lines = text.split('\n');
+
+            lines.forEach(line => {
+                if (!line.trim()) return;
+                // Remove timestamp [HH:MM:SS]
+                const message = line.replace(/^\[.*?\]\s*/, '').trim();
+
+                if (message === "Added Domino") {
+                    replayQueue.push({ type: 'addDomino' });
+                } else if (message.startsWith("Turned Left")) {
+                    const radius = parseInt(message.match(/Radius: (\d+)/)[1], 10);
+                    replayQueue.push({ type: 'turnLeft', radius: radius });
+                } else if (message.startsWith("Turned Right")) {
+                    const radius = parseInt(message.match(/Radius: (\d+)/)[1], 10);
+                    replayQueue.push({ type: 'turnRight', radius: radius });
+                } else if (message === "Split Two-Way") {
+                    replayQueue.push({ type: 'splitTwoWay' });
+                } else if (message.startsWith("Split") && message.endsWith("-Way")) {
+                    const n = parseInt(message.match(/Split (\d+)-Way/)[1], 10);
+                    replayQueue.push({ type: 'splitNWay', n: n });
+                } else if (message.startsWith("Color Changed:")) {
+                    const color = message.split(': ')[1];
+                    replayQueue.push({ type: 'setColor', color: color });
+                } else if (message.startsWith("Material Changed:")) {
+                    const material = message.split(': ')[1];
+                    replayQueue.push({ type: 'setMaterial', material: material });
+                } else if (message.startsWith("Geometry Changed:")) {
+                    const geometry = message.split(': ')[1];
+                    replayQueue.push({ type: 'setGeometry', geometry: geometry });
+                } else if (message.startsWith("Animation Speed:")) {
+                    const speed = parseFloat(message.split(': ')[1]);
+                    replayQueue.push({ type: 'setSpeed', speed: speed });
+                } else if (message === "Animation Started") {
+                    replayQueue.push({ type: 'startAnimation' });
+                } else if (message === "Animation Reset") {
+                    replayQueue.push({ type: 'resetAnimation' });
+                } else if (message.startsWith("Domino Selected (ID:")) {
+                    const id = parseInt(message.match(/ID: (\d+)/)[1], 10);
+                    replayQueue.push({ type: 'selectDomino', id: id });
+                } else if (message.startsWith("Domino Deselected (ID:")) {
+                    const id = parseInt(message.match(/ID: (\d+)/)[1], 10);
+                    replayQueue.push({ type: 'deselectDomino', id: id });
+                } else if (message === "Moved X +2") {
+                    replayQueue.push({ type: 'moveX' });
+                } else if (message === "Moved Z +2") {
+                    replayQueue.push({ type: 'moveZ' });
+                } else if (message === "Doubled Scale") {
+                    replayQueue.push({ type: 'doubleScale' });
+                } else if (message === "Enlarged Scale") {
+                    replayQueue.push({ type: 'enlargeScale' });
+                }
+            });
+
+            if (replayQueue.length > 0) {
+                replayControls.style.display = 'block';
+                updateReplayStatus();
+                alert(`Imported ${replayQueue.length} steps. Ready to replay.`);
+            } else {
+                alert("No valid steps found in log.");
+            }
+        }
+
+        function updateReplayStatus() {
+            replayStatus.textContent = `Step ${currentReplayIndex} / ${replayQueue.length}`;
+        }
+
+        stepBtn.addEventListener('click', () => {
+            if (currentReplayIndex >= replayQueue.length) {
+                alert("Replay complete.");
+                return;
+            }
+
+            const command = replayQueue[currentReplayIndex];
+            executeCommand(command);
+            currentReplayIndex++;
+            updateReplayStatus();
+        });
+
+        function executeCommand(cmd) {
+            switch (cmd.type) {
+                case 'addDomino':
+                    addDomino();
+                    break;
+                case 'turnLeft':
+                    document.getElementById('radius-select').value = cmd.radius;
+                    turnLeft();
+                    break;
+                case 'turnRight':
+                    document.getElementById('radius-select').value = cmd.radius;
+                    turnRight();
+                    break;
+                case 'splitTwoWay':
+                    splitTwoWay();
+                    break;
+                case 'splitNWay':
+                    document.getElementById('n-way-select').value = cmd.n;
+                    splitNWay();
+                    break;
+                case 'setColor':
+                    document.getElementById('color-picker').value = cmd.color;
+                    if (selectedDominoes.size > 0) {
+                        const colorVal = cmd.color;
+                        selectedDominoes.forEach(domino => {
+                            const mesh = domino.group.children[0];
+                            const bodyMat = mesh.material[0];
+                            bodyMat.color.set(colorVal);
+                            mesh.userData.baseEmissive = bodyMat.emissive ? bodyMat.emissive.getHex() : 0x000000;
+                        });
+                        updateHighlights();
+                        logAction(`Color Changed: ${cmd.color}`);
+                    }
+                    break;
+                case 'setMaterial':
+                    document.getElementById('material-select').value = cmd.material;
+                    document.getElementById('material-select').dispatchEvent(new Event('change'));
+                    break;
+                case 'setGeometry':
+                    document.getElementById('geometry-select').value = cmd.geometry;
+                    document.getElementById('geometry-select').dispatchEvent(new Event('change'));
+                    break;
+                case 'setSpeed':
+                    document.getElementById('speed-slider').value = cmd.speed;
+                    document.getElementById('speed-slider').dispatchEvent(new Event('input'));
+                    break;
+                case 'startAnimation':
+                    document.getElementById('start-btn').click();
+                    break;
+                case 'resetAnimation':
+                    // Reset all
+                    dominoes.forEach(d => {
+                        d.group.rotation.x = 0;
+                        d.isFalling = false;
+                        d.fallen = false;
+                        d.triggeredNext = false;
+                        d.group.position.y = 0;
+                    });
+                    logAction("Animation Reset");
+                    break;
+                case 'selectDomino':
+                    const dominoToSelect = dominoes.find(d => d.id === cmd.id);
+                    if (dominoToSelect) {
+                        selectedDominoes.clear(); // Assume single selection for now or handle multi-select logic if needed
+                        selectedDominoes.add(dominoToSelect);
+                        activeDomino = dominoToSelect;
+                        updateHighlights();
+                        logAction(`Domino Selected (ID: ${cmd.id})`);
+                    }
+                    break;
+                case 'deselectDomino':
+                    const dominoToDeselect = dominoes.find(d => d.id === cmd.id);
+                    if (dominoToDeselect) {
+                        selectedDominoes.delete(dominoToDeselect);
+                        if (activeDomino === dominoToDeselect) {
+                            activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
+                        }
+                        updateHighlights();
+                        logAction(`Domino Deselected (ID: ${cmd.id})`);
+                    }
+                    break;
+                case 'moveX':
+                    if (selectedDominoes.size > 0) {
+                        selectedDominoes.forEach(domino => {
+                            domino.group.position.x += 2;
+                        });
+                        logAction("Moved X +2");
+                    }
+                    break;
+                case 'moveZ':
+                    if (selectedDominoes.size > 0) {
+                        selectedDominoes.forEach(domino => {
+                            domino.group.position.z += 2;
+                        });
+                        logAction("Moved Z +2");
+                    }
+                    break;
+                case 'doubleScale':
+                    if (selectedDominoes.size > 0) {
+                        selectedDominoes.forEach(domino => {
+                            const mesh = domino.group.children[0];
+                            mesh.scale.x *= 2;
+                            mesh.scale.y *= 2;
+                            mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                        });
+                        logAction("Doubled Scale");
+                    }
+                    break;
+                case 'enlargeScale':
+                    if (selectedDominoes.size > 0) {
+                        selectedDominoes.forEach(domino => {
+                            const mesh = domino.group.children[0];
+                            mesh.scale.x *= 1.19;
+                            mesh.scale.y *= 1.19;
+                            mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                        });
+                        logAction("Enlarged Scale");
+                    }
+                    break;
+            }
+        }
 
         // --- Configuration ---
         const DOMINO_WIDTH = 1;
@@ -305,6 +663,7 @@
         // --- Domino Management ---
         const dominoes = [];
         const DOMINO_SPACING = 1.0; // Distance between dominoes
+        let dominoIdCounter = 0; // Global counter for unique domino IDs
 
         let activeDomino = null; // The currently selected domino for adding new ones
         const selectedDominoes = new Set(); // Track all selected dominoes
@@ -532,9 +891,8 @@
             dominoGroup.rotation.y = rotationY;
             scene.add(dominoGroup);
 
-            // Use custom rounded geometry
-            const geoType = document.getElementById('geometry-select').value;
-            const geometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, geoType);
+            const geometryType = document.getElementById('geometry-select').value;
+            const geometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, geometryType);
 
             let bodyMaterial;
             if (isRainbowMode) {
@@ -545,7 +903,13 @@
                 const hue = (dominoes.length * 0.05) % 1.0;
                 bodyMaterial.color.setHSL(hue, 1.0, 0.5);
             } else {
-                bodyMaterial = currentMaterial.clone();
+                // Use current color from picker
+                const colorVal = document.getElementById('color-picker').value;
+                bodyMaterial = new THREE.MeshStandardMaterial({
+                    color: colorVal,
+                    roughness: 0.3,
+                    metalness: 0.1
+                });
             }
 
             // Create material array: [Body, Top(Black)]
@@ -554,41 +918,44 @@
                 blackMaterial // Index 1: Top
             ];
 
-            const dominoMesh = new THREE.Mesh(geometry, materialsArray);
+            const dominoMesh = new THREE.Mesh(geometry, [bodyMaterial, blackMaterial]);
 
-            if (isRainbowMode) {
-                const hue = (dominoes.length * 0.05) % 1.0;
-                dominoMesh.userData.hue = hue;
-            } else {
-                dominoMesh.userData.hue = null;
-            }
-
-            // Pivot Adjustment:
-            // Pivot is at (0, 0, 0) of the group.
-            // We want the pivot to be the bottom edge at +Z (relative to the domino center).
-            // Since we fall towards +Z, the pivot is the "front" bottom edge.
-            // Mesh Position relative to Group:
-            // X: 0
-            // Y: +Height/2
-            // Z: -Depth/2
+            // Adjust mesh position so that the pivot point (0,0,0 of group) is at the bottom-center-front edge
+            // The geometry is centered at (0,0,0) by default (if center() was called) or based on shape.
+            // Our shape is centered at (0,0). Extrude depth is centered if we didn't specify otherwise?
+            // ExtrudeGeometry creates mesh with Z from 0 to depth usually? No, it depends.
+            // Let's assume we need to lift it up by height/2 and move back by depth/2?
+            // Wait, previous code had:
+            // dominoMesh.position.set(0, DOMINO_HEIGHT / 2, -DOMINO_DEPTH / 2);
+            // This suggests the geometry origin is at the center of the face, but Z is 0..depth?
+            // Let's keep the previous offset logic for now.
             dominoMesh.position.set(0, DOMINO_HEIGHT / 2, -DOMINO_DEPTH / 2);
+
             dominoMesh.castShadow = true;
             dominoMesh.receiveShadow = true;
-
-            // Store base emissive properties for highlighting logic
-            dominoMesh.userData.baseEmissive = bodyMaterial.emissive ? bodyMaterial.emissive.getHex() : 0x000000;
-            dominoMesh.userData.baseEmissiveIntensity = bodyMaterial.emissiveIntensity !== undefined ? bodyMaterial.emissiveIntensity : 1.0;
-
             dominoGroup.add(dominoMesh);
 
+            // Store metadata
+            const dominoId = dominoIdCounter++;
+            dominoMesh.userData = {
+                id: dominoId,
+                isDomino: true,
+                baseEmissive: bodyMaterial.emissive ? bodyMaterial.emissive.getHex() : 0x000000,
+                baseEmissiveIntensity: bodyMaterial.emissiveIntensity !== undefined ? bodyMaterial.emissiveIntensity : 1.0
+            };
+            if (isRainbowMode) {
+                dominoMesh.userData.hue = (dominoes.length * 0.05) % 1.0;
+            }
+
             const dominoObject = {
+                id: dominoId,
                 group: dominoGroup,
                 isFalling: false,
                 fallen: false,
-                children: [] // Graph connections
+                children: []
             };
 
-            // Store reference in UserData for Raycasting
+            // Link mesh back to object for raycasting
             dominoMesh.userData.domino = dominoObject;
 
             return dominoObject;
@@ -639,47 +1006,38 @@
         document.getElementById('geometry-select').addEventListener('change', (e) => {
             const type = e.target.value;
             drawDominoShape(DOMINO_WIDTH, DOMINO_HEIGHT, type);
+            logAction(`Geometry Changed: ${e.target.value}`);
         });
 
         function addDomino() {
-            if (selectedDominoes.size === 0) return;
+            if (!activeDomino) return;
 
-            const newSelection = new Set();
-            const currentSelection = Array.from(selectedDominoes);
+            for (let i = 0; i < 2; i++) {
+                const last = activeDomino;
+                const lastPos = last.group.position;
+                const lastRot = last.group.rotation.y;
 
-            currentSelection.forEach(activeDomino => {
-                let last = activeDomino;
-                for (let i = 0; i < 2; i++) {
-                    const lastPos = last.group.position;
-                    const lastRot = last.group.rotation.y;
+                // Forward vector based on rotation (assuming +Z is forward in local space)
+                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
 
-                    // Forward vector based on rotation (assuming +Z is forward in local space)
-                    const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
+                const newPos = lastPos.clone().add(forward.multiplyScalar(DOMINO_SPACING));
 
-                    const newPos = lastPos.clone().add(forward.multiplyScalar(DOMINO_SPACING));
+                const newDomino = createDominoAt(newPos.x, newPos.z, lastRot);
+                dominoes.push(newDomino);
 
-                    const newDomino = createDominoAt(newPos.x, newPos.z, lastRot);
-                    dominoes.push(newDomino);
+                // Connect graph
+                last.children.push(newDomino);
 
-                    // Connect graph
-                    last.children.push(newDomino);
-
-                    last = newDomino;
-                }
-                newSelection.add(last);
-            });
-
-            selectedDominoes.clear();
-            newSelection.forEach(d => selectedDominoes.add(d));
-
-            // Update activeDomino to one of the new ones (e.g. the last one added)
-            if (selectedDominoes.size > 0) {
-                activeDomino = Array.from(selectedDominoes).pop();
-            } else {
-                activeDomino = null;
+                // Advance active domino
+                activeDomino = newDomino;
             }
 
+            // Update selection to the newly created dominoes (the last one created)
+            selectedDominoes.clear();
+            selectedDominoes.add(activeDomino);
+
             updateHighlights();
+            logAction("Added Domino");
         }
 
         function turnLeft() {
@@ -741,6 +1099,7 @@
             }
 
             updateHighlights();
+            logAction(`Turned Left (Radius: ${radius})`);
         }
 
         function turnRight() {
@@ -800,6 +1159,7 @@
             }
 
             updateHighlights();
+            logAction(`Turned Right (Radius: ${radius})`);
         }
 
         function splitTwoWay() {
@@ -845,6 +1205,7 @@
             }
 
             updateHighlights();
+            logAction("Split Two-Way");
         }
 
         // --- Animation Loop ---
@@ -860,9 +1221,16 @@
                     if (domino.group.rotation.x < targetRotation) {
                         domino.group.rotation.x += animationSpeed * delta;
 
+                        // Calculate lift to keep the front edge on the ground
+                        // Pivot is at center-bottom. Front edge is at z = DOMINO_DEPTH / 2.
+                        // Dip amount is (DOMINO_DEPTH / 2) * Math.sin(rotationX)
+                        const lift = (DOMINO_DEPTH / 2) * Math.sin(domino.group.rotation.x);
+                        domino.group.position.y = lift;
+
                         // Chain Reaction Logic
                         // If this domino has fallen enough (e.g., 30 degrees), trigger children
-                        if (domino.group.rotation.x > Math.PI / 6) {
+                        if (domino.group.rotation.x > Math.PI / 6 && !domino.triggeredNext) {
+                            domino.triggeredNext = true; // Mark as triggered to prevent re-triggering
                             domino.children.forEach(child => {
                                 if (!child.isFalling) {
                                     child.isFalling = true;
@@ -876,6 +1244,10 @@
                         if (domino.group.rotation.x > targetRotation) {
                             domino.group.rotation.x = targetRotation;
                             domino.fallen = true; // Stop processing this domino
+
+                            // Ensure final position is corrected
+                            const lift = (DOMINO_DEPTH / 2) * Math.sin(targetRotation);
+                            domino.group.position.y = lift;
                         }
                     }
                 }
@@ -901,13 +1273,17 @@
 
             if (dominoes.length > 0 && !dominoes[0].isFalling) {
                 dominoes[0].isFalling = true;
+                logAction("Animation Started");
             } else {
                 // Reset all
                 dominoes.forEach(d => {
                     d.group.rotation.x = 0;
                     d.isFalling = false;
                     d.fallen = false;
+                    d.triggeredNext = false;
+                    d.group.position.y = 0;
                 });
+                logAction("Animation Reset");
             }
         });
 
@@ -917,6 +1293,28 @@
         speedSlider.addEventListener('input', (e) => {
             animationSpeed = parseFloat(e.target.value);
             speedVal.textContent = animationSpeed.toFixed(1);
+            logAction(`Animation Speed: ${animationSpeed.toFixed(1)}`);
+        });
+
+        // Color Picker Listener
+        const colorPicker = document.getElementById('color-picker');
+        colorPicker.addEventListener('change', (e) => { // Changed to 'change' to log only when finalized, or keep 'input' and debounce? 'change' is better for log.
+            const colorVal = e.target.value;
+            logAction(`Color Changed: ${colorVal}`);
+        });
+        colorPicker.addEventListener('input', (e) => {
+            const colorVal = e.target.value;
+            if (selectedDominoes.size > 0) {
+                selectedDominoes.forEach(domino => {
+                    const mesh = domino.group.children[0];
+                    if (Array.isArray(mesh.material)) {
+                        const bodyMat = mesh.material[0];
+                        bodyMat.color.set(colorVal);
+                        // Note: Do not update baseEmissive here, as the current emissive might be the highlight color.
+                    }
+                });
+                updateHighlights();
+            }
         });
 
         // Material Select
@@ -956,8 +1354,31 @@
                 const selectedMaterial = materials[selectedValue];
                 currentMaterial = selectedMaterial;
 
-                // Update existing dominoes
-                dominoes.forEach(d => {
+                // Update selected dominoes if any, otherwise update all?
+                // User request: "Materialの変更をした場合には、選択中のドミノのMaterialを..."
+                // Implies: If there is a selection, update ONLY the selection.
+                // But previously it updated ALL dominoes.
+                // Let's assume: If selection exists -> Update Selection. Else -> Update All (or Future only? Previous code updated ALL).
+                // Previous code: `dominoes.forEach(...)`. This updates ALL.
+                // If I change it to update only selection, it changes behavior.
+                // But usually "Change Material" implies changing the "Current Tool Material" AND "Selected Objects".
+                // If no objects selected, it just changes tool.
+                // But the previous code explicitly updated ALL dominoes.
+                // "Update existing dominoes" comment confirms this.
+                // If I want to support "Update Selection", I should probably prioritize selection.
+                // If selection > 0, update selection.
+                // If selection == 0, update all? Or just future?
+                // The prompt says "Materialの変更をした場合には、選択中のドミノのMaterialwo" (truncated).
+                // Likely "Materialを更新してください" (Update the material of the selected dominoes).
+                // If I change the behavior to ONLY update selection, the user might lose the ability to bulk-update everything.
+                // But "Select All" (Ctrl+A equivalent) isn't there, but we have "Update All" behavior now.
+                // Let's implement:
+                // If selection > 0: Update ONLY selected dominoes.
+                // Else: Update ALL dominoes (keep existing behavior for backward compatibility/convenience).
+
+                const targetDominoes = selectedDominoes.size > 0 ? Array.from(selectedDominoes) : dominoes;
+
+                targetDominoes.forEach(d => {
                     const mesh = d.group.children[0];
                     const bodyMat = currentMaterial.clone();
 
@@ -970,11 +1391,38 @@
                     mesh.userData.hue = null;
 
                     // Update base emissive data
-                    mesh.userData.baseEmissive = currentMaterial.emissive ? currentMaterial.emissive.getHex() : 0x000000;
-                    mesh.userData.baseEmissiveIntensity = currentMaterial.emissiveIntensity !== undefined ? currentMaterial.emissiveIntensity : 1.0;
+                    mesh.userData.baseEmissive = bodyMat.emissive ? bodyMat.emissive.getHex() : 0x000000;
+                    mesh.userData.baseEmissiveIntensity = bodyMat.emissiveIntensity !== undefined ? bodyMat.emissiveIntensity : 1.0;
                 });
             }
             updateHighlights(); // Re-apply highlights based on new material data
+            logAction(`Material Changed: ${selectedValue}`);
+        });
+
+        // Geometry Select
+        const geometrySelect = document.getElementById('geometry-select');
+        geometrySelect.addEventListener('change', (e) => {
+            const selectedValue = e.target.value;
+
+            // Update selected dominoes if any, otherwise update all?
+            // Consistent with material change logic:
+            // If selection > 0: Update ONLY selected dominoes.
+            // Else: Update ALL dominoes.
+
+            const targetDominoes = selectedDominoes.size > 0 ? Array.from(selectedDominoes) : dominoes;
+
+            targetDominoes.forEach(d => {
+                const mesh = d.group.children[0];
+
+                // Dispose old geometry
+                mesh.geometry.dispose();
+
+                // Create new geometry
+                const newGeometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, selectedValue);
+                mesh.geometry = newGeometry;
+            });
+
+            logAction(`Geometry Changed: ${selectedValue}`);
         });
 
         // Add "Add Domino" button
@@ -1009,6 +1457,71 @@
             return btn;
         }
 
+        function splitNWay() {
+            if (selectedDominoes.size === 0) return;
+
+            const targetN = parseInt(document.getElementById('n-way-select').value, 10);
+            const newSelection = new Set();
+            const currentSelection = Array.from(selectedDominoes);
+            const lateralSpacing = 1.2;
+
+            currentSelection.forEach(activeDomino => {
+                let currentLayer = [activeDomino];
+                let currentPos = activeDomino.group.position.clone();
+                let currentRot = activeDomino.group.rotation.y;
+
+                // Forward vector
+                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), currentRot);
+                // Right vector
+                const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), currentRot);
+
+                for (let r = 2; r <= targetN; r++) {
+                    const nextLayer = [];
+                    const rowWidth = (r - 1) * lateralSpacing;
+                    const startOffset = -rowWidth / 2;
+
+                    // Move forward for the new row
+                    currentPos.add(forward.clone().multiplyScalar(DOMINO_SPACING));
+
+                    for (let i = 0; i < r; i++) {
+                        const offset = startOffset + i * lateralSpacing;
+                        // Calculate position: Center + Right * offset
+                        const pos = currentPos.clone().add(right.clone().multiplyScalar(offset));
+
+                        const newDomino = createDominoAt(pos.x, pos.z, currentRot);
+                        dominoes.push(newDomino);
+                        nextLayer.push(newDomino);
+
+                        // Connect parents
+                        // Parent at index j connects to children at j and j+1
+                        // So child at i connects to parents at i-1 and i (if they exist)
+                        if (i > 0) {
+                            currentLayer[i - 1].children.push(newDomino);
+                        }
+                        if (i < currentLayer.length) {
+                            currentLayer[i].children.push(newDomino);
+                        }
+                    }
+                    currentLayer = nextLayer;
+                }
+
+                // Add the last layer to selection
+                currentLayer.forEach(d => newSelection.add(d));
+            });
+
+            selectedDominoes.clear();
+            newSelection.forEach(d => selectedDominoes.add(d));
+
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
+            }
+
+            updateHighlights();
+            logAction(`Split ${targetN}-Way`);
+        }
+
         createButton("Add Domino", () => {
             addDomino();
             playClickSound();
@@ -1025,9 +1538,48 @@
             splitTwoWay();
             playClickSound();
         }, '#fa709a', '#fee140');
+        createButton("N-Way", () => {
+            splitNWay();
+            playClickSound();
+        }, '#ff9a9e', '#fecfef');
+
+        createButton("Move X +2", () => {
+            if (selectedDominoes.size > 0) {
+                selectedDominoes.forEach(domino => {
+                    domino.group.position.x += 2;
+                });
+                logAction("Moved X +2");
+            }
+            playClickSound();
+        }, '#ff9a9e', '#fecfef');
+
+        createButton("Move Z +2", () => {
+            if (selectedDominoes.size > 0) {
+                selectedDominoes.forEach(domino => {
+                    domino.group.position.z += 2;
+                });
+                logAction("Moved Z +2");
+            }
+            playClickSound();
+        }, '#a1c4fd', '#c2e9fb');
+
+        createButton("Enlarge", () => {
+            if (selectedDominoes.size > 0) {
+                selectedDominoes.forEach(domino => {
+                    const mesh = domino.group.children[0];
+                    mesh.scale.x *= 1.19;
+                    mesh.scale.y *= 1.19;
+
+                    mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                });
+                logAction("Enlarged Scale");
+            }
+            playClickSound();
+        }, '#84fab0', '#8fd3f4');
 
         createButton("Piano", () => {
             playPianoSound();
+            logAction("Played Piano Sound");
         }, '#4facfe', '#00f2fe');
 
         // Cannon button removed as per user request
@@ -1037,6 +1589,7 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            logAction("Window Resized");
         });
 
         // Handle Click for Selection
@@ -1070,15 +1623,18 @@
                                     activeDomino = null;
                                 }
                             }
+                            logAction(`Domino Deselected (ID: ${clickedDomino.id})`);
                         } else {
                             selectedDominoes.add(clickedDomino);
                             activeDomino = clickedDomino;
+                            logAction(`Domino Selected (ID: ${clickedDomino.id})`);
                         }
                     } else {
                         // Single selection
                         selectedDominoes.clear();
                         selectedDominoes.add(clickedDomino);
                         activeDomino = clickedDomino;
+                        logAction(`Domino Selected (ID: ${clickedDomino.id})`);
                     }
 
                     updateHighlights();
