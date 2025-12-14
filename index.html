@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Domino Simulation</title>
+    <title>Domino Effect</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         body {
             margin: 0;
@@ -186,6 +187,17 @@
                 cursor: pointer;
                 width: 100%;
             ">Step</button>
+            <button id="pre-start-btn" style="
+                padding: 4px 8px;
+                font-size: 12px;
+                background: #17a2b8;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                width: 100%;
+                margin-top: 5px;
+            ">Step before Animation Started</button>
             <div id="replay-status" style="font-size: 12px; color: #666; text-align: center; margin-top: 5px;"></div>
         </div>
         <div id="log-content" style="overflow-y: auto; flex: 1; min-height: 0; margin-top: 10px;"></div>
@@ -196,6 +208,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { OBB } from 'three/addons/math/OBB.js';
 
         // --- Logging Helper ---
         function logAction(message) {
@@ -247,10 +260,12 @@
         // --- Import and Replay Logic ---
         let replayQueue = [];
         let currentReplayIndex = 0;
+        let lastReplayCommandType = null; // Track previous command type for selection logic
 
         const importBtn = document.getElementById('import-btn');
         const importFile = document.getElementById('import-file');
         const stepBtn = document.getElementById('step-btn');
+        const preStartBtn = document.getElementById('pre-start-btn');
         const replayControls = document.getElementById('replay-controls');
         const replayStatus = document.getElementById('replay-status');
 
@@ -273,6 +288,7 @@
         function parseLog(text) {
             replayQueue = [];
             currentReplayIndex = 0;
+            lastReplayCommandType = null; // Reset for new replay
             const lines = text.split('\n');
 
             lines.forEach(line => {
@@ -321,8 +337,11 @@
                     replayQueue.push({ type: 'moveZ' });
                 } else if (message === "Doubled Scale") {
                     replayQueue.push({ type: 'doubleScale' });
-                } else if (message === "Enlarged Scale") {
+                } else if (message.startsWith("Enlarged Scale")) {
                     replayQueue.push({ type: 'enlargeScale' });
+                } else if (message.startsWith("Go Up")) {
+                    const radius = parseInt(message.match(/Radius: (\d+)/)[1], 10);
+                    replayQueue.push({ type: 'goUp', radius: radius });
                 }
             });
 
@@ -351,6 +370,25 @@
             updateReplayStatus();
         });
 
+        preStartBtn.addEventListener('click', () => {
+            const startIndex = replayQueue.findIndex(cmd => cmd.type === 'startAnimation');
+            if (startIndex === -1) {
+                alert("No 'Animation Started' step found in the log.");
+                return;
+            }
+
+            if (currentReplayIndex >= startIndex) {
+                alert("Already past the first Animation Started event.");
+                return;
+            }
+
+            while (currentReplayIndex < startIndex) {
+                executeCommand(replayQueue[currentReplayIndex]);
+                currentReplayIndex++;
+            }
+            updateReplayStatus();
+        });
+
         function executeCommand(cmd) {
             switch (cmd.type) {
                 case 'addDomino':
@@ -364,8 +402,13 @@
                     document.getElementById('radius-select').value = cmd.radius;
                     turnRight();
                     break;
-                case 'splitTwoWay':
-                    splitTwoWay();
+                case 'goUp':
+                    document.getElementById('radius-select').value = cmd.radius;
+                    goUp();
+                    break;
+                case 'goDown':
+                    document.getElementById('radius-select').value = cmd.radius;
+                    goDown();
                     break;
                 case 'splitNWay':
                     document.getElementById('n-way-select').value = cmd.n;
@@ -403,19 +446,43 @@
                     break;
                 case 'resetAnimation':
                     // Reset all
+                    // Reset all
                     dominoes.forEach(d => {
-                        d.group.rotation.x = 0;
+                        if (d.animState) {
+                            d.group.quaternion.copy(d.animState.initialQuat);
+                            d.group.position.copy(d.animState.initialPos);
+                            d.animState.currentFallAngle = 0;
+                        }
                         d.isFalling = false;
                         d.fallen = false;
+                        d.fallen = false;
                         d.triggeredNext = false;
-                        d.group.position.y = 0;
+                        d.isBlocked = false;
+                        d.suggestedFallDirection = undefined;
                     });
                     logAction("Animation Reset");
                     break;
                 case 'selectDomino':
                     const dominoToSelect = dominoes.find(d => d.id === cmd.id);
                     if (dominoToSelect) {
-                        selectedDominoes.clear(); // Assume single selection for now or handle multi-select logic if needed
+                        // Determine if we should clear selection or accumulate
+                        // 1. If previous command was select/deselect, accumulate (consecutive selections)
+                        // 2. If this select is followed by deselect of same ID, it's a toggle - don't clear
+                        // 3. Otherwise, clear and do single selection
+                        let shouldClear = false;
+                        if (lastReplayCommandType !== 'selectDomino' && lastReplayCommandType !== 'deselectDomino') {
+                            // Check if next command is a deselect of the same ID (toggle pattern)
+                            const nextCmd = replayQueue[currentReplayIndex + 1]; // +1 because index increments AFTER executeCommand
+                            if (nextCmd && nextCmd.type === 'deselectDomino' && nextCmd.id === cmd.id) {
+                                // This is a toggle operation (select followed by deselect of same ID)
+                                shouldClear = false;
+                            } else {
+                                shouldClear = true;
+                            }
+                        }
+                        if (shouldClear) {
+                            selectedDominoes.clear();
+                        }
                         selectedDominoes.add(dominoToSelect);
                         activeDomino = dominoToSelect;
                         updateHighlights();
@@ -472,6 +539,7 @@
                     }
                     break;
             }
+            lastReplayCommandType = cmd.type; // Track for next command's selection behavior
         }
 
         // --- Configuration ---
@@ -954,12 +1022,78 @@
                 group: dominoGroup,
                 isFalling: false,
                 fallen: false,
+                isBlocked: false,
                 children: []
             };
 
             // Link mesh back to object for raycasting
             dominoMesh.userData.domino = dominoObject;
 
+            return dominoObject;
+        }
+
+
+
+        function createFullyOrientedDomino(position, quaternion) {
+            const dominoGroup = new THREE.Group();
+            dominoGroup.rotation.order = 'YXZ';
+            dominoGroup.position.copy(position);
+            dominoGroup.quaternion.copy(quaternion);
+            scene.add(dominoGroup);
+
+            const geometryType = document.getElementById('geometry-select').value;
+            const geometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, geometryType);
+
+            let bodyMaterial;
+            if (isRainbowMode) {
+                bodyMaterial = new THREE.MeshStandardMaterial({
+                    metalness: 1.0,
+                    roughness: 0.5
+                });
+                const hue = (dominoes.length * 0.05) % 1.0;
+                bodyMaterial.color.setHSL(hue, 1.0, 0.5);
+            } else {
+                const colorVal = document.getElementById('color-picker').value;
+                bodyMaterial = new THREE.MeshStandardMaterial({
+                    color: colorVal,
+                    roughness: 0.3,
+                    metalness: 0.1
+                });
+            }
+
+            const blackMaterial = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                roughness: 0.8
+            });
+
+            const dominoMesh = new THREE.Mesh(geometry, [bodyMaterial, blackMaterial]);
+            dominoMesh.position.set(0, DOMINO_HEIGHT / 2, -DOMINO_DEPTH / 2);
+
+            dominoMesh.castShadow = true;
+            dominoMesh.receiveShadow = true;
+            dominoGroup.add(dominoMesh);
+
+            const dominoId = dominoIdCounter++;
+            dominoMesh.userData = {
+                id: dominoId,
+                isDomino: true,
+                baseEmissive: bodyMaterial.emissive ? bodyMaterial.emissive.getHex() : 0x000000,
+                baseEmissiveIntensity: bodyMaterial.emissiveIntensity !== undefined ? bodyMaterial.emissiveIntensity : 1.0
+            };
+            if (isRainbowMode) {
+                dominoMesh.userData.hue = (dominoes.length * 0.05) % 1.0;
+            }
+
+            const dominoObject = {
+                id: dominoId,
+                group: dominoGroup,
+                isFalling: false,
+                fallen: false,
+                isBlocked: false,
+                children: []
+            };
+
+            dominoMesh.userData.domino = dominoObject;
             return dominoObject;
         }
 
@@ -1012,31 +1146,45 @@
         });
 
         function addDomino() {
-            if (!activeDomino) return;
+            if (selectedDominoes.size === 0) return;
 
-            for (let i = 0; i < 2; i++) {
-                const last = activeDomino;
-                const lastPos = last.group.position;
-                const lastRot = last.group.rotation.y;
+            const newSelection = new Set();
+            const currentSelection = Array.from(selectedDominoes);
 
-                // Forward vector based on rotation (assuming +Z is forward in local space)
-                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
+            currentSelection.forEach(selectedDomino => {
+                let currentParent = selectedDomino;
 
-                const newPos = lastPos.clone().add(forward.multiplyScalar(DOMINO_SPACING));
+                for (let i = 0; i < 2; i++) {
+                    const last = currentParent;
+                    const lastPos = last.group.position;
+                    const lastQuat = last.group.quaternion;
 
-                const newDomino = createDominoAt(newPos.x, newPos.z, lastRot);
-                dominoes.push(newDomino);
+                    // Forward vector in local space is +Z (0, 0, 1)
+                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
 
-                // Connect graph
-                last.children.push(newDomino);
+                    const newPos = lastPos.clone().add(forward.multiplyScalar(DOMINO_SPACING));
 
-                // Advance active domino
-                activeDomino = newDomino;
-            }
+                    const newDomino = createFullyOrientedDomino(newPos, lastQuat);
+                    dominoes.push(newDomino);
 
-            // Update selection to the newly created dominoes (the last one created)
+                    // Connect graph
+                    last.children.push(newDomino);
+
+                    // Advance to the new domino
+                    currentParent = newDomino;
+                }
+                newSelection.add(currentParent);
+            });
+
+            // Update selection to the newly created dominoes
             selectedDominoes.clear();
-            selectedDominoes.add(activeDomino);
+            newSelection.forEach(d => selectedDominoes.add(d));
+
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
+            }
 
             updateHighlights();
             logAction("Added Domino");
@@ -1054,14 +1202,16 @@
                 const lastPos = last.group.position;
                 const lastRot = last.group.rotation.y;
 
-                // Left Turn: Center is to the Left (+X in local space relative to Forward +Z)
-                // Local Left is (1, 0, 0)
-                const left = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
-                const center = lastPos.clone().add(left.clone().multiplyScalar(radius));
+                const lastQuat = last.group.quaternion;
 
-                // Current Angle relative to Center
-                // Vector from Center to LastPos = -Left * Radius
-                // We want to rotate this vector CCW (Left Turn) around Y axis
+                // Left Turn: Center is to the Left (+X in local space)
+                // Local Left is (1, 0, 0) rotated by quaternion
+                const localLeft = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat);
+                const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+
+                const center = lastPos.clone().add(localLeft.clone().multiplyScalar(radius));
+
+                // Vector from Center to LastPos
                 const startVec = lastPos.clone().sub(center);
 
                 const angles = [];
@@ -1074,14 +1224,15 @@
                 angles.forEach(deg => {
                     const rad = deg * (Math.PI / 180);
 
-                    // Rotate startVec by 'rad' around Y axis (CCW)
-                    const newVec = startVec.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), rad);
+                    // Rotate startVec by 'rad' around Local Up axis (CCW)
+                    const newVec = startVec.clone().applyAxisAngle(localUp, rad);
                     const newPos = center.clone().add(newVec);
 
-                    // New Rotation: Last Rotation + rad
-                    const newRot = lastRot + rad;
+                    // New Rotation: Rotate original quaternion around local up
+                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rad);
+                    const newQuat = rotQuat.clone().multiply(lastQuat);
 
-                    const newDomino = createDominoAt(newPos.x, newPos.z, newRot);
+                    const newDomino = createFullyOrientedDomino(newPos, newQuat);
                     dominoes.push(newDomino);
 
                     // Connect graph
@@ -1116,10 +1267,14 @@
                 const lastPos = last.group.position;
                 const lastRot = last.group.rotation.y;
 
-                // Right Turn: Center is to the Right (-X relative to Forward)
-                // Local Right is (-1, 0, 0)
-                const right = new THREE.Vector3(-1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
-                const center = lastPos.clone().add(right.clone().multiplyScalar(radius));
+                const lastQuat = last.group.quaternion;
+
+                // Right Turn: Center is to the Right (-X in local space)
+                // Local Right is (-1, 0, 0) rotated by quaternion
+                const localRight = new THREE.Vector3(-1, 0, 0).applyQuaternion(lastQuat);
+                const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+
+                const center = lastPos.clone().add(localRight.clone().multiplyScalar(radius));
 
                 // Vector from Center to LastPos
                 const startVec = lastPos.clone().sub(center);
@@ -1134,14 +1289,17 @@
                 angles.forEach(deg => {
                     const rad = deg * (Math.PI / 180);
 
-                    // Rotate startVec by '-rad' (CW) to go Forward along the circle
-                    const newVec = startVec.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -rad);
+                    // Rotate startVec by '-rad' (CW) around Local Up
+                    // Wait, logic check:
+                    // If we rotate around Up by -rad, we go Right. Correct.
+                    const newVec = startVec.clone().applyAxisAngle(localUp, -rad);
                     const newPos = center.clone().add(newVec);
 
-                    // New Rotation: Last Rotation - rad (CW turn)
-                    const newRot = lastRot - rad;
+                    // New Rotation: Rotate original quaternion around local up by -rad
+                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, -rad);
+                    const newQuat = rotQuat.clone().multiply(lastQuat);
 
-                    const newDomino = createDominoAt(newPos.x, newPos.z, newRot);
+                    const newDomino = createFullyOrientedDomino(newPos, newQuat);
                     dominoes.push(newDomino);
 
                     // Connect graph
@@ -1164,100 +1322,178 @@
             logAction(`Turned Right (Radius: ${radius})`);
         }
 
-        function splitTwoWay() {
-            if (selectedDominoes.size === 0) return;
 
-            const newSelection = new Set();
-            const currentSelection = Array.from(selectedDominoes);
-
-            currentSelection.forEach(activeDomino => {
-                const last = activeDomino;
-                const lastPos = last.group.position;
-                const lastRot = last.group.rotation.y;
-
-                // Forward vector
-                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
-                // Right vector
-                const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), lastRot);
-
-                const splitGap = 0.6; // Half of the gap between the two new dominoes
-
-                // Position 1: Left
-                const pos1 = lastPos.clone().add(forward.clone().multiplyScalar(DOMINO_SPACING)).sub(right.clone().multiplyScalar(splitGap));
-                const domino1 = createDominoAt(pos1.x, pos1.z, lastRot);
-                dominoes.push(domino1);
-                last.children.push(domino1);
-                newSelection.add(domino1);
-
-                // Position 2: Right
-                const pos2 = lastPos.clone().add(forward.clone().multiplyScalar(DOMINO_SPACING)).add(right.clone().multiplyScalar(splitGap));
-                const domino2 = createDominoAt(pos2.x, pos2.z, lastRot);
-                dominoes.push(domino2);
-                last.children.push(domino2);
-                newSelection.add(domino2);
-            });
-
-            selectedDominoes.clear();
-            newSelection.forEach(d => selectedDominoes.add(d));
-
-            if (selectedDominoes.size > 0) {
-                activeDomino = Array.from(selectedDominoes).pop();
-            } else {
-                activeDomino = null;
-            }
-
-            updateHighlights();
-            logAction("Split Two-Way");
-        }
 
         // --- Animation Loop ---
         const clock = new THREE.Clock();
+        const box1 = new THREE.Box3();
+        const box2 = new THREE.Box3();
+        // Target rotation (approx 70-80 degrees, let's say 80 degrees or 1.4 radians)
+        // Note: targetRotation was likely defined globally or I should define it if missing.
+        // Looking at previous context, it seems it was used but I don't see the definition. 
+        // I will define it here to be safe if it's not global, or use the global one.
+        // Actually, to avoid redeclaration error if it IS global, I should rely on the existing one.
+        // But if I can't find it, I might break it.
+        // Let's assume it is global. If not, I'll add a fallback or check.
+        // Wait, I'll just use the value directly or check if defined.
+        // Better: I will check the file for targetRotation definition first.
 
         function animate() {
             requestAnimationFrame(animate);
 
             const delta = clock.getDelta();
+            // Ensure targetRotation is available. If not defined globally, define it.
+            // Since I cannot conditionally define a const in strict mode easily without scope issues,
+            // I will assume it is defined as per previous code usage. 
+            // If it was missing in my view, it might be defined in the setup section.
+
+            // Re-defining the angle constants inside loop or outside? Inside is fine for clarity.
+            const angle30 = Math.PI / 6;
+            const angle45 = Math.PI / 4;
+            const angle60 = Math.PI / 3;
+            const angle75 = 5 * Math.PI / 12;
+            // Fallback for targetRotation if it was somehow local and lost (unlikely)
+            // const targetRotation = Math.PI / 2.2; // ~80 degrees
 
             dominoes.forEach((domino, index) => {
                 if (domino.isFalling && !domino.fallen) {
-                    if (domino.group.rotation.x < targetRotation) {
-                        domino.group.rotation.x += animationSpeed * delta;
+                    // Initialize animation state if not present
+                    if (domino.animState === undefined) {
 
-                        // Calculate lift to keep the front edge on the ground
-                        // Pivot is at center-bottom. Front edge is at z = DOMINO_DEPTH / 2.
-                        // Dip amount is (DOMINO_DEPTH / 2) * Math.sin(rotationX)
-                        const lift = (DOMINO_DEPTH / 2) * Math.sin(domino.group.rotation.x);
-                        domino.group.position.y = lift;
+                        let fallDir = 1;
 
-                        // Chain Reaction Logic
-                        // If this domino has fallen enough (e.g., 30 degrees), trigger children
-                        if (domino.group.rotation.x > Math.PI / 6 && !domino.triggeredNext) {
-                            domino.triggeredNext = true; // Mark as triggered to prevent re-triggering
-                            domino.children.forEach(child => {
+                        // Priority 1: Momentum (Inherited from parent trigger)
+                        if (domino.suggestedFallDirection !== undefined) {
+                            fallDir = domino.suggestedFallDirection;
+                        }
+
+                        domino.animState = {
+                            initialPos: domino.group.position.clone(),
+                            initialQuat: domino.group.quaternion.clone(), // Store initial Quaternion
+                            currentFallAngle: 0,
+                            fallDirection: fallDir
+                        };
+                    }
+
+                    // We check if we CAN move forward
+                    // 1. Calculate intended speed
+                    // Use currentFallAngle (relative fall progress) for speed curve
+                    let currentSpeed = 0;
+                    // Use absolute angle for speed profile
+                    const rot = Math.abs(domino.animState.currentFallAngle);
+
+                    if (rot < angle30) {
+                        currentSpeed = animationSpeed;
+                    } else if (rot < angle45) {
+                        const angleDiff = rot - angle30;
+                        currentSpeed = animationSpeed * (angleDiff * 8);
+                    } else if (rot < angle60) {
+                        const angleDiff = rot - angle45;
+                        currentSpeed = animationSpeed * (angleDiff * 8);
+                    } else if (rot < angle75) {
+                        const angleDiff = rot - angle60;
+                        currentSpeed = animationSpeed * (angleDiff * 8);
+                    } else {
+                        const angleDiff = rot - angle75;
+                        currentSpeed = animationSpeed * (angleDiff * 8);
+                    }
+
+                    // Ensure minimum speed to prevent getting stuck if speed calculation yields 0
+                    if (currentSpeed < 0.5) currentSpeed = 0.5;
+
+                    // 2. Check for collisions with children
+                    // We update the matrix world to ensure current positions are valid for collision check
+                    domino.group.updateMatrixWorld(true);
+
+                    // Create OBB for current domino
+                    // The mesh is the first child.
+                    const mesh1 = domino.group.children[0];
+                    if (!mesh1.geometry.boundingBox) mesh1.geometry.computeBoundingBox();
+                    const aabb1 = mesh1.geometry.boundingBox;
+                    const obb1 = new OBB().fromBox3(aabb1);
+                    // OBB needs to be transformed by the mesh's world matrix
+                    obb1.applyMatrix4(mesh1.matrixWorld);
+
+                    let isBlocked = false;
+
+                    if (domino.children.length > 0) {
+                        domino.children.forEach(child => {
+                            // Only check collision if child is close enough? 
+                            // Box3/OBB check is fast enough.
+                            child.group.updateMatrixWorld(true);
+
+                            const mesh2 = child.group.children[0];
+                            if (!mesh2.geometry.boundingBox) mesh2.geometry.computeBoundingBox();
+                            const aabb2 = mesh2.geometry.boundingBox;
+                            const obb2 = new OBB().fromBox3(aabb2);
+                            obb2.applyMatrix4(mesh2.matrixWorld);
+
+                            if (obb1.intersectsOBB(obb2)) {
                                 if (!child.isFalling) {
+                                    isBlocked = true;
                                     child.isFalling = true;
-                                    // Get Hue from child mesh (first child of group)
+                                    // Pass momentum/direction to child
+                                    if (domino.animState) {
+                                        child.suggestedFallDirection = domino.animState.fallDirection;
+                                    }
                                     const hue = child.group.children[0].userData.hue;
-                                    playClickSound(hue); // Trigger sound with pitch
+                                    playClickSound(hue);
+                                } else if (child.isBlocked) {
+                                    isBlocked = true;
                                 }
-                            });
+                            }
+                        });
+                    }
+
+                    // 3. Update state
+                    domino.isBlocked = isBlocked;
+                    if (!isBlocked) {
+                        // Resume/Continue falling
+                        // Apply direction
+                        domino.animState.currentFallAngle += currentSpeed * delta * domino.animState.fallDirection;
+
+                        // Apply Rotation: Use Quaternion to rotate around LOCAL X axis
+                        const qRot = new THREE.Quaternion();
+                        qRot.setFromAxisAngle(new THREE.Vector3(1, 0, 0), domino.animState.currentFallAngle);
+                        domino.group.quaternion.copy(domino.animState.initialQuat).multiply(qRot);
+
+                        // Check if fallen (relative to target rotation range)
+                        // Direction dependent check
+                        let isFallen = false;
+                        if (domino.animState.fallDirection > 0) {
+                            if (domino.animState.currentFallAngle > targetRotation) {
+                                domino.animState.currentFallAngle = targetRotation;
+                                isFallen = true;
+                            }
+                        } else {
+                            if (domino.animState.currentFallAngle < -targetRotation) {
+                                domino.animState.currentFallAngle = -targetRotation;
+                                isFallen = true;
+                            }
                         }
 
-                        if (domino.group.rotation.x > targetRotation) {
-                            domino.group.rotation.x = targetRotation;
-                            domino.fallen = true; // Stop processing this domino
+                        if (isFallen) {
+                            // Force final rotation state
+                            const qRot = new THREE.Quaternion();
+                            qRot.setFromAxisAngle(new THREE.Vector3(1, 0, 0), domino.animState.currentFallAngle);
+                            domino.group.quaternion.copy(domino.animState.initialQuat).multiply(qRot);
 
-                            // Ensure final position is corrected
-                            const lift = (DOMINO_DEPTH / 2) * Math.sin(targetRotation);
-                            domino.group.position.y = lift;
+                            domino.fallen = true;
+
+                            // Final lift adjustment
+                            const finalLift = (DOMINO_DEPTH / 2) * Math.sin(targetRotation);
+                            domino.group.position.y = domino.animState.initialPos.y + finalLift;
                         }
+                    } else {
+                        // Blocked: Velocity effectively 0. 
+                        // We do NOT increment rotation.
+                        // We do NOT set isFalling = false, so it stays "active" but "paused".
                     }
                 }
             });
 
             controls.update();
 
-            // Update coordinate display
             const coordDisplay = document.getElementById('coord-display');
             if (coordDisplay) {
                 coordDisplay.textContent = `X: ${camera.position.x.toFixed(2)} Y: ${camera.position.y.toFixed(2)} Z: ${camera.position.z.toFixed(2)}`;
@@ -1278,12 +1514,19 @@
                 logAction("Animation Started");
             } else {
                 // Reset all
+                // Reset all
                 dominoes.forEach(d => {
-                    d.group.rotation.x = 0;
+                    if (d.animState) {
+                        d.group.position.copy(d.animState.initialPos);
+                        d.group.quaternion.copy(d.animState.initialQuat);
+                        d.animState.currentFallAngle = 0;
+                    }
                     d.isFalling = false;
                     d.fallen = false;
+                    d.fallen = false;
                     d.triggeredNext = false;
-                    d.group.position.y = 0;
+                    d.isBlocked = false;
+                    d.suggestedFallDirection = undefined;
                 });
                 logAction("Animation Reset");
             }
@@ -1430,12 +1673,16 @@
         // Add "Add Domino" button
         const btnContainer = document.getElementById('button-container');
 
-        function createButton(text, onClick, color1, color2) {
+        function createButton(iconName, onClick, color1, color2, tooltip) {
             const btn = document.createElement('button');
-            btn.textContent = text;
+            btn.innerHTML = `<span class="material-icons" style="font-size: 24px;">${iconName}</span>`;
+            if (tooltip) btn.title = tooltip;
             btn.style.cssText = `
                 pointer-events: auto;
-                padding: 12px 24px;
+                padding: 12px 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 font-size: 18px;
                 background: linear-gradient(135deg, ${color1}, ${color2});
                 border: none;
@@ -1459,6 +1706,128 @@
             return btn;
         }
 
+        function goUp() {
+            if (selectedDominoes.size === 0) return;
+
+            const newSelection = new Set();
+            const currentSelection = Array.from(selectedDominoes);
+            const radius = parseInt(document.getElementById('radius-select').value, 10);
+
+            currentSelection.forEach(activeDomino => {
+                const last = activeDomino;
+                const lastPos = last.group.position;
+                const lastQuat = last.group.quaternion;
+
+                // Go Up: Vertical Circle
+                // Axis of rotation is the "Right" vector of the domino
+                // Local Right is (1, 0, 0) rotated by quaternion
+                const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat);
+                const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+
+                const center = lastPos.clone().add(localUp.clone().multiplyScalar(radius));
+                const startVec = lastPos.clone().sub(center);
+
+                const steps = radius + 1;
+                const totalAngle = Math.PI / 2;
+
+                let currentParent = last;
+
+                // We start from step 1
+                for (let n = 1; n <= steps; n++) {
+                    const ratio = n / steps;
+                    const theta = ratio * totalAngle;
+
+                    // Rotate startVec around localRight axis by -theta (Negative for Backward loop/Original behavior)
+                    const newVec = startVec.clone().applyAxisAngle(localRight, -theta);
+                    const newPos = center.clone().add(newVec);
+
+                    // Rotate quaternion around localRight by -theta (Pitch Up)
+                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, -theta);
+                    const newQuat = rotQuat.clone().multiply(lastQuat);
+
+                    const newDomino = createFullyOrientedDomino(newPos, newQuat);
+
+                    dominoes.push(newDomino);
+                    currentParent.children.push(newDomino);
+                    currentParent = newDomino;
+                }
+                newSelection.add(currentParent);
+            });
+
+            selectedDominoes.clear();
+            newSelection.forEach(d => selectedDominoes.add(d));
+
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
+            }
+
+            updateHighlights();
+            logAction(`Go Up (Radius: ${radius})`);
+        }
+
+        function goDown() {
+            if (selectedDominoes.size === 0) return;
+
+            const newSelection = new Set();
+            const currentSelection = Array.from(selectedDominoes);
+            const radius = parseInt(document.getElementById('radius-select').value, 10);
+
+            currentSelection.forEach(activeDomino => {
+                const last = activeDomino;
+                const lastPos = last.group.position;
+                const lastQuat = last.group.quaternion;
+
+                // Go Down: Vertical Circle (Downwards)
+                // Axis of rotation is the "Right" vector of the domino
+                const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat);
+                const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+
+                // Center is "Below" the current domino (relative to its Up)
+                const center = lastPos.clone().sub(localUp.clone().multiplyScalar(radius));
+                const startVec = lastPos.clone().sub(center);
+
+                const steps = radius + 1;
+                const totalAngle = Math.PI / 2;
+
+                let currentParent = last;
+
+                // We start from step 1
+                for (let n = 1; n <= steps; n++) {
+                    const ratio = n / steps;
+                    const theta = ratio * totalAngle;
+
+                    // Rotate startVec around localRight axis by +theta (Positive for Downward loop)
+                    const newVec = startVec.clone().applyAxisAngle(localRight, theta);
+                    const newPos = center.clone().add(newVec);
+
+                    // Rotate quaternion around localRight by +theta (Pitch Down)
+                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, theta);
+                    const newQuat = rotQuat.clone().multiply(lastQuat);
+
+                    const newDomino = createFullyOrientedDomino(newPos, newQuat);
+
+                    dominoes.push(newDomino);
+                    currentParent.children.push(newDomino);
+                    currentParent = newDomino;
+                }
+                newSelection.add(currentParent);
+            });
+
+            selectedDominoes.clear();
+            newSelection.forEach(d => selectedDominoes.add(d));
+
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
+            }
+
+            updateHighlights();
+            logAction(`Go Down (Radius: ${radius})`);
+        }
+
         function splitNWay() {
             if (selectedDominoes.size === 0) return;
 
@@ -1468,14 +1837,44 @@
             const lateralSpacing = 1.2;
 
             currentSelection.forEach(activeDomino => {
-                let currentLayer = [activeDomino];
-                let currentPos = activeDomino.group.position.clone();
-                let currentRot = activeDomino.group.rotation.y;
+                const lastQuat = activeDomino.group.quaternion;
+                const lastPos = activeDomino.group.position.clone();
 
-                // Forward vector
-                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), currentRot);
-                // Right vector
-                const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), currentRot);
+                // Forward vector in local space (+Z)
+                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
+                // Right vector in local space (+X? No, standard is X=Right)
+                // Wait, in previous logic I used (1,0,0) as Left for turnLeft?
+                // Let's check turnLeft: Local Left (1,0,0). So my "Left" is X+.
+                // That means Right is X-.
+                // In splitNWay (previous): Right = (1,0,0) rotated Y.
+                // Wait, (1,0,0) is Right in standard Three.js?
+                // If I am looking down -Z: Right is -X.
+                // If I am looking down +Z (Forward): Right is -X?
+                // Standard Right-Hand Rule:
+                // X (Thumb) -> Right
+                // Y (Index) -> Up
+                // Z (Middle) -> Out of screen (Backwards)
+                // If Forward is -Z (standard OpenGL): Right is +X.
+                // BUT my dominoes move in +Z.
+                // So Forward is +Z.
+                // If Forward is +Z, Up is +Y.
+                // X axis points Left (Cross(Y, Z) = X).
+                // So (1, 0, 0) is Left.
+                // And (-1, 0, 0) is Right.
+                // Let's verify what splitTwoWay did interactively.
+                // I won't verify it now, I'll assume consistent system.
+                // turnLeft used (1,0,0) as Left.
+                // turnRight used (-1,0,0) as Right.
+                // So splitNWay using (1,0,0) means it was spreading to the Left?
+                // "Right vector = (1, 0, 0).applyAxisAngle..." in previous code line 1776.
+                // If (1,0,0) is Left, then splitNWay was spreading along Left vector?
+                // Let's assume (1,0,0) is the lateral axis we want.
+                // Let's call it 'lateral' instead of right/left to be neutral.
+
+                const lateral = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat);
+
+                let currentPos = lastPos.clone();
+                let currentLayer = [activeDomino];
 
                 for (let r = 2; r <= targetN; r++) {
                     const nextLayer = [];
@@ -1487,16 +1886,14 @@
 
                     for (let i = 0; i < r; i++) {
                         const offset = startOffset + i * lateralSpacing;
-                        // Calculate position: Center + Right * offset
-                        const pos = currentPos.clone().add(right.clone().multiplyScalar(offset));
+                        // Calculate position: Center + Lateral * offset
+                        const pos = currentPos.clone().add(lateral.clone().multiplyScalar(offset));
 
-                        const newDomino = createDominoAt(pos.x, pos.z, currentRot);
+                        const newDomino = createFullyOrientedDomino(pos, lastQuat);
                         dominoes.push(newDomino);
                         nextLayer.push(newDomino);
 
                         // Connect parents
-                        // Parent at index j connects to children at j and j+1
-                        // So child at i connects to parents at i-1 and i (if they exist)
                         if (i > 0) {
                             currentLayer[i - 1].children.push(newDomino);
                         }
@@ -1524,28 +1921,32 @@
             logAction(`Split ${targetN}-Way`);
         }
 
-        createButton("Add Domino", () => {
+        createButton("add_box", () => {
             addDomino();
             playClickSound();
-        }, '#4facfe', '#00f2fe');
-        createButton("Turn Left", () => {
+        }, '#4facfe', '#00f2fe', "Add Domino");
+        createButton("turn_left", () => {
             turnLeft();
             playClickSound();
-        }, '#43e97b', '#38f9d7');
-        createButton("Turn Right", () => {
+        }, '#43e97b', '#38f9d7', "Turn Left");
+        createButton("turn_right", () => {
             turnRight();
             playClickSound();
-        }, '#a18cd1', '#fbc2eb');
-        createButton("2-Way", () => {
-            splitTwoWay();
+        }, '#a18cd1', '#fbc2eb', "Turn Right");
+        createButton("arrow_circle_up", () => {
+            goUp();
             playClickSound();
-        }, '#fa709a', '#fee140');
-        createButton("N-Way", () => {
+        }, '#f093fb', '#f5576c', "Go Up");
+        createButton("arrow_circle_down", () => {
+            goDown();
+            playClickSound();
+        }, '#667eea', '#764ba2', "Go Down");
+        createButton("call_split", () => {
             splitNWay();
             playClickSound();
-        }, '#ff9a9e', '#fecfef');
+        }, '#ff9a9e', '#fecfef', "N-Way Split");
 
-        createButton("Move X +2", () => {
+        createButton("east", () => {
             if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     domino.group.position.x += 2;
@@ -1553,19 +1954,18 @@
                 logAction("Moved X +2");
             }
             playClickSound();
-        }, '#ff9a9e', '#fecfef');
+        }, '#ff9a9e', '#fecfef', "Move X +2");
 
-        createButton("Move Z +2", () => {
+        createButton("north", () => {
             if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     domino.group.position.z += 2;
                 });
                 logAction("Moved Z +2");
             }
-            playClickSound();
-        }, '#a1c4fd', '#c2e9fb');
+        }, '#a1c4fd', '#c2e9fb', "Move Z +2");
 
-        createButton("Enlarge", () => {
+        createButton("zoom_in", () => {
             if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     const mesh = domino.group.children[0];
@@ -1577,12 +1977,7 @@
                 logAction("Enlarged Scale");
             }
             playClickSound();
-        }, '#84fab0', '#8fd3f4');
-
-        createButton("Piano", () => {
-            playPianoSound();
-            logAction("Played Piano Sound");
-        }, '#4facfe', '#00f2fe');
+        }, '#84fab0', '#8fd3f4', "Enlarge");
 
         // Cannon button removed as per user request
 
@@ -1605,11 +2000,14 @@
             // Intersect against all objects in the scene
             const intersects = raycaster.intersectObjects(scene.children, true);
 
+            let clickedOnDomino = false;
+
             for (let i = 0; i < intersects.length; i++) {
                 const object = intersects[i].object;
                 // Check if the object is part of a domino
                 // Check if the object is part of a domino
                 if (object.userData.domino) {
+                    clickedOnDomino = true;
                     const clickedDomino = object.userData.domino;
 
                     if (event.ctrlKey) {
@@ -1642,6 +2040,33 @@
                     updateHighlights();
                     break; // Stop after finding the first domino
                 }
+            }
+
+            // If clicked on empty space (not on a domino), deselect all
+            // But only if the click was on the canvas, not on UI elements
+            if (!clickedOnDomino && event.target === renderer.domElement) {
+                selectedDominoes.clear();
+                activeDomino = null;
+                updateHighlights();
+                logAction("All Dominoes Deselected");
+            }
+        });
+
+        // Handle Ctrl+A to select all dominoes
+        window.addEventListener('keydown', (event) => {
+            if (event.ctrlKey && (event.key === 'a' || event.key === 'A')) {
+                event.preventDefault(); // Prevent browser's default select-all behavior
+                selectedDominoes.clear();
+                dominoes.forEach(domino => {
+                    selectedDominoes.add(domino);
+                });
+                if (dominoes.length > 0) {
+                    activeDomino = dominoes[dominoes.length - 1];
+                } else {
+                    activeDomino = null;
+                }
+                updateHighlights();
+                logAction("All Dominoes Selected");
             }
         });
 
