@@ -45,6 +45,89 @@
         #start-btn:active {
             transform: translateY(0);
         }
+
+        #left-panel {
+            position: absolute;
+            top: 170px;
+            /* Below 150px canvas + margin */
+            left: 10px;
+            width: 240px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            pointer-events: auto;
+            z-index: 10;
+            max-height: calc(100vh - 180px);
+            overflow-y: auto;
+            padding-right: 5px;
+            /* For scrollbar */
+        }
+
+        #button-container {
+            position: static;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        #parameters-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: rgba(30, 30, 30, 0.8);
+            padding: 12px;
+            border-radius: 12px;
+            color: white;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        #parameters-container>div {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #parameters-container label {
+            font-size: 13px;
+            color: #ccc;
+        }
+
+        #parameters-container select,
+        #parameters-container input[type="number"],
+        #parameters-container input[type="range"] {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        #parameters-container option {
+            background-color: #333;
+            color: white;
+        }
+
+        /* Custom scrollbar for panel */
+        #left-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #left-panel::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        #left-panel::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        #start-btn {
+            grid-column: 1 / -1;
+            /* Span full width */
+            width: 100%;
+        }
     </style>
     <!-- Import map for Three.js -->
     <script type="importmap">
@@ -59,90 +142,109 @@
 
 <body>
     <div id="info">
-        <div id="button-container">
-            <button id="start-btn">Push Domino</button>
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="speed-slider" style="margin-right: 10px;">Speed: <span id="speed-val">3.0</span></label>
-            <input type="range" id="speed-slider" min="0.5" max="10" step="0.1" value="3.0"
-                style="vertical-align: middle;">
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="material-select" style="margin-right: 10px;">Material:</label>
-            <select id="material-select" style="padding: 5px; border-radius: 4px;">
-                <option value="Glass">Glass</option>
-                <option value="Matte" selected>Matte</option>
-                <option value="Chrome">Chrome</option>
-                <option value="Rough Metal">Rough Metal</option>
-                <option value="Glossy Green">Glossy Green</option>
-                <option value="Rainbow">Rainbow</option>
-            </select>
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="radius-select" style="margin-right: 10px;">Turn Radius:</label>
-            <select id="radius-select" style="padding: 5px; border-radius: 4px;">
-                <!-- Options will be populated by script -->
-            </select>
-            <script>
-                const radiusSelect = document.getElementById('radius-select');
-                for (let i = 2; i <= 30; i++) {
-                    const option = document.createElement('option');
-                    option.value = i;
-                    option.textContent = i;
-                    if (i === 2) option.selected = true;
-                    radiusSelect.appendChild(option);
-                }
-            </script>
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="geometry-select" style="margin-right: 10px;">Geometry:</label>
-            <select id="geometry-select" style="padding: 5px; border-radius: 4px;">
-                <option value="standard" selected>Standard</option>
-                <option value="rounded">Rounded</option>
-                <option value="circle">Circle</option>
-                <option value="diamond">Diamond</option>
-                <option value="heart">Heart</option>
-            </select>
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="n-way-select" style="margin-right: 10px;">N-Way:</label>
-            <select id="n-way-select" style="padding: 5px; border-radius: 4px;">
-                <!-- Options 2 to 10 -->
-                <option value="2" selected>2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-                <option value="5">5</option>
-                <option value="6">6</option>
-                <option value="7">7</option>
-                <option value="8">8</option>
-                <option value="9">9</option>
-                <option value="10">10</option>
-            </select>
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="color-picker" style="margin-right: 10px;">Color 1:</label>
-            <input type="color" id="color-picker" value="#ff6b6b"
-                style="padding: 0; border: none; border-radius: 4px; height: 30px; width: 50px; vertical-align: middle;">
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="color-picker-2" style="margin-right: 10px;">Color 2:</label>
-            <input type="color" id="color-picker-2" value="#6e8efb"
-                style="padding: 0; border: none; border-radius: 4px; height: 30px; width: 50px; vertical-align: middle;">
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label style="margin-right: 10px;">
-                <input type="checkbox" id="gradation-check" style="vertical-align: middle;">
-                Gradation Mode
-            </label>
-        </div>
-        <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="gradation-step" style="margin-right: 10px;">Gradation Step:</label>
-            <input type="number" id="gradation-step" min="1" max="100" value="10"
-                style="width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
-        </div>
         <div style="margin-top: 10px; pointer-events: auto;">
             <div id="coord-display" style="background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px;">
                 X: 0.00 Y: 0.00 Z: 0.00
+            </div>
+        </div>
+    </div>
+
+    <!-- Left Panel -->
+    <div id="left-panel">
+        <div id="button-container">
+            <button id="start-btn">Push Domino</button>
+        </div>
+
+        <div id="parameters-container">
+            <!-- 1. Speed -->
+            <div>
+                <label for="speed-slider">Speed: <span id="speed-val">3.0</span></label>
+                <input type="range" id="speed-slider" min="0.5" max="10" step="0.1" value="3.0" style="width: 100px;">
+            </div>
+
+            <!-- 2. Turn Radius -->
+            <div>
+                <label for="radius-select">Turn Radius:</label>
+                <select id="radius-select" style="width: 60px;">
+                    <!-- Options populated by script -->
+                </select>
+                <script>
+                    const radiusSelect = document.getElementById('radius-select');
+                    for (let i = 2; i <= 30; i++) {
+                        const option = document.createElement('option');
+                        option.value = i;
+                        option.textContent = i;
+                        if (i === 2) option.selected = true;
+                        radiusSelect.appendChild(option);
+                    }
+                </script>
+            </div>
+
+            <!-- 3. N-Way -->
+            <div>
+                <label for="n-way-select">N-Way:</label>
+                <select id="n-way-select" style="width: 60px;">
+                    <option value="2" selected>2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                </select>
+            </div>
+
+            <!-- 4. Color 1 -->
+            <div>
+                <label for="color-picker">Color 1:</label>
+                <input type="color" id="color-picker" value="#ff6b6b"
+                    style="padding: 0; border: none; height: 24px; width: 40px; cursor: pointer;">
+            </div>
+
+            <!-- 5. Color 2 -->
+            <div>
+                <label for="color-picker-2">Color 2:</label>
+                <input type="color" id="color-picker-2" value="#6e8efb"
+                    style="padding: 0; border: none; height: 24px; width: 40px; cursor: pointer;">
+            </div>
+
+            <!-- 6. Gradation Mode -->
+            <div style="justify-content: flex-start;">
+                <input type="checkbox" id="gradation-check" style="margin-right: 8px;">
+                <label for="gradation-check" style="cursor: pointer;">Gradation Mode</label>
+            </div>
+
+            <!-- 7. Gradation Step -->
+            <div>
+                <label for="gradation-step">Gradation Step:</label>
+                <input type="number" id="gradation-step" min="1" max="100" value="10" style="width: 50px;">
+            </div>
+
+            <!-- 8. Geometry -->
+            <div>
+                <label for="geometry-select">Geometry:</label>
+                <select id="geometry-select" style="width: 100px;">
+                    <option value="standard" selected>Standard</option>
+                    <option value="rounded">Rounded</option>
+                    <option value="circle">Circle</option>
+                    <option value="diamond">Diamond</option>
+                    <option value="heart">Heart</option>
+                </select>
+            </div>
+
+            <!-- 9. Material -->
+            <div>
+                <label for="material-select">Material:</label>
+                <select id="material-select" style="width: 100px;">
+                    <option value="Glass">Glass</option>
+                    <option value="Matte" selected>Matte</option>
+                    <option value="Chrome">Chrome</option>
+                    <option value="Rough Metal">Rough Metal</option>
+                    <option value="Glossy Green">Glossy Green</option>
+                    <option value="Rainbow">Rainbow</option>
+                </select>
             </div>
         </div>
     </div>
@@ -246,31 +348,39 @@
 
         // --- Export Helper ---
         document.getElementById('export-btn').addEventListener('click', () => {
-            const logContent = document.getElementById('log-content');
-            let text = "";
-            // Iterate over children to get text content cleanly
-            for (const child of logContent.children) {
-                text += child.innerText + "\n";
+            try {
+                const logContent = document.getElementById('log-content');
+                let text = "";
+                // Iterate over children to get text content cleanly
+                for (const child of logContent.children) {
+                    text += child.innerText + "\n";
+                }
+
+                // Sync the internal replay queue with the new export
+                parseLog(text, true);
+
+                if (!text) {
+                    alert("No history to export.");
+                    return;
+                }
+
+                const blob = new Blob([text], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+
+                const now = new Date();
+                const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+                a.download = `domino_history_${timestamp}.txt`;
+
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert("Export Error: " + e.message);
+                console.error(e);
             }
-
-            if (!text) {
-                alert("No history to export.");
-                return;
-            }
-
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            a.download = `domino_history_${timestamp}.txt`;
-
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
         });
 
         // --- Import and Replay Logic ---
@@ -301,7 +411,7 @@
             reader.readAsText(file);
         });
 
-        function parseLog(text) {
+        function parseLog(text, silent = false) {
             replayQueue = [];
             currentReplayIndex = 0;
             lastReplayCommandType = null; // Reset for new replay
@@ -328,6 +438,9 @@
                 } else if (message.startsWith("Color Changed:")) {
                     const color = message.split(': ')[1];
                     replayQueue.push({ type: 'setColor', color: color });
+                } else if (message.startsWith("Color 2 Changed:")) {
+                    const color = message.split(': ')[1];
+                    replayQueue.push({ type: 'setColor2', color: color });
                 } else if (message.startsWith("Material Changed:")) {
                     const material = message.split(': ')[1];
                     replayQueue.push({ type: 'setMaterial', material: material });
@@ -343,10 +456,12 @@
                     replayQueue.push({ type: 'resetAnimation' });
                 } else if (message.startsWith("Domino Selected (ID:")) {
                     const id = parseInt(message.match(/ID: (\d+)/)[1], 10);
-                    replayQueue.push({ type: 'selectDomino', id: id });
+                    const isMulti = message.includes("[Multi]");
+                    replayQueue.push({ type: 'selectDomino', id: id, isMulti: isMulti });
                 } else if (message.startsWith("Domino Deselected (ID:")) {
                     const id = parseInt(message.match(/ID: (\d+)/)[1], 10);
-                    replayQueue.push({ type: 'deselectDomino', id: id });
+                    const isMulti = message.includes("[Multi]");
+                    replayQueue.push({ type: 'deselectDomino', id: id, isMulti: isMulti });
                 } else if (message === "Moved X +2") {
                     replayQueue.push({ type: 'moveX' });
                 } else if (message === "Moved Z +2") {
@@ -358,15 +473,21 @@
                 } else if (message.startsWith("Go Up")) {
                     const radius = parseInt(message.match(/Radius: (\d+)/)[1], 10);
                     replayQueue.push({ type: 'goUp', radius: radius });
+                } else if (message.startsWith("Gradation Mode:")) {
+                    const enabled = message.includes("On");
+                    replayQueue.push({ type: 'setGradationMode', enabled: enabled });
+                } else if (message.startsWith("Gradation Step:")) {
+                    const step = parseInt(message.split(': ')[1], 10);
+                    replayQueue.push({ type: 'setGradationStep', step: step });
                 }
             });
 
             if (replayQueue.length > 0) {
                 replayControls.style.display = 'block';
                 updateReplayStatus();
-                alert(`Imported ${replayQueue.length} steps. Ready to replay.`);
+                if (!silent) alert(`Imported ${replayQueue.length} steps. Ready to replay.`);
             } else {
-                alert("No valid steps found in log.");
+                if (!silent) alert("No valid steps found in log.");
             }
         }
 
@@ -481,28 +602,14 @@
                 case 'selectDomino':
                     const dominoToSelect = dominoes.find(d => d.id === cmd.id);
                     if (dominoToSelect) {
-                        // Determine if we should clear selection or accumulate
-                        // 1. If previous command was select/deselect, accumulate (consecutive selections)
-                        // 2. If this select is followed by deselect of same ID, it's a toggle - don't clear
-                        // 3. Otherwise, clear and do single selection
-                        let shouldClear = false;
-                        if (lastReplayCommandType !== 'selectDomino' && lastReplayCommandType !== 'deselectDomino') {
-                            // Check if next command is a deselect of the same ID (toggle pattern)
-                            const nextCmd = replayQueue[currentReplayIndex + 1]; // +1 because index increments AFTER executeCommand
-                            if (nextCmd && nextCmd.type === 'deselectDomino' && nextCmd.id === cmd.id) {
-                                // This is a toggle operation (select followed by deselect of same ID)
-                                shouldClear = false;
-                            } else {
-                                shouldClear = true;
-                            }
-                        }
-                        if (shouldClear) {
+                        // If NOT isMulti, clear selection first.
+                        if (!cmd.isMulti) {
                             selectedDominoes.clear();
                         }
                         selectedDominoes.add(dominoToSelect);
                         activeDomino = dominoToSelect;
                         updateHighlights();
-                        logAction(`Domino Selected (ID: ${cmd.id})`);
+                        logAction(`Domino Selected (ID: ${cmd.id})${cmd.isMulti ? ' [Multi]' : ''}`);
                     }
                     break;
                 case 'deselectDomino':
@@ -513,7 +620,7 @@
                             activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
                         }
                         updateHighlights();
-                        logAction(`Domino Deselected (ID: ${cmd.id})`);
+                        logAction(`Domino Deselected (ID: ${cmd.id})${cmd.isMulti ? ' [Multi]' : ''}`);
                     }
                     break;
                 case 'moveX':
@@ -531,6 +638,18 @@
                         });
                         logAction("Moved Z +2");
                     }
+                    break;
+                case 'setGradationMode':
+                    document.getElementById('gradation-check').checked = cmd.enabled;
+                    logAction(`Gradation Mode: ${cmd.enabled ? 'On' : 'Off'}`);
+                    break;
+                case 'setGradationStep':
+                    document.getElementById('gradation-step').value = cmd.step;
+                    logAction(`Gradation Step: ${cmd.step}`);
+                    break;
+                case 'setColor2':
+                    document.getElementById('color-picker-2').value = cmd.color;
+                    logAction(`Color 2 Changed: ${cmd.color}`);
                     break;
                 case 'doubleScale':
                     if (selectedDominoes.size > 0) {
@@ -1694,6 +1813,12 @@
             }
         });
 
+        // Color 2 Picker Listener
+        const colorPicker2 = document.getElementById('color-picker-2');
+        colorPicker2.addEventListener('input', (e) => {
+            logAction(`Color 2 Changed: ${e.target.value}`);
+        });
+
         // Material Select
         const materialSelect = document.getElementById('material-select');
         materialSelect.addEventListener('change', (e) => {
@@ -1785,6 +1910,16 @@
             logAction(`Geometry Changed: ${selectedValue}`);
         });
 
+        // Gradation Mode Listener
+        document.getElementById('gradation-check').addEventListener('change', (e) => {
+            logAction(`Gradation Mode: ${e.target.checked ? 'On' : 'Off'}`);
+        });
+
+        // Gradation Step Listener
+        document.getElementById('gradation-step').addEventListener('input', (e) => {
+            logAction(`Gradation Step: ${e.target.value}`);
+        });
+
         // Add "Add Domino" button
         const btnContainer = document.getElementById('button-container');
 
@@ -1795,18 +1930,18 @@
             btn.style.cssText = `
                 pointer-events: auto;
                 padding: 12px 16px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 18px;
+                font-size: 14px;
                 background: linear-gradient(135deg, ${color1}, ${color2});
                 border: none;
                 border-radius: 8px;
-                color: #333;
+                color: white;
                 cursor: pointer;
-                margin-left: 10px;
-                transition: transform 0.2s, box-shadow 0.2s;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition: transform 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%; /* Full width for grid cell */
             `;
             btn.onmouseover = () => {
                 btn.style.transform = 'translateY(-2px)';
@@ -1891,7 +2026,7 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction(`Go Up (Radius: ${radius})`);
+            logAction(`Go Up(Radius: ${radius})`);
         }
 
         function goDown() {
@@ -1964,7 +2099,7 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction(`Go Down (Radius: ${radius})`);
+            logAction(`Go Down(Radius: ${radius})`);
         }
 
         function splitNWay() {
@@ -2071,33 +2206,57 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction(`Split ${targetN}-Way`);
+            logAction(`Split ${targetN} -Way`);
         }
 
         createButton("add_box", () => {
             addDomino();
             playClickSound();
         }, '#4facfe', '#00f2fe', "Add Domino");
+
+        createButton("undo", () => {
+            undoLastAction();
+            playClickSound();
+        }, '#dfe9f3', '#909090', "Undo"); // Adjusted color for visibility
+
         createButton("turn_left", () => {
             turnLeft();
             playClickSound();
         }, '#43e97b', '#38f9d7', "Turn Left");
+
         createButton("turn_right", () => {
             turnRight();
             playClickSound();
         }, '#a18cd1', '#fbc2eb', "Turn Right");
+
         createButton("arrow_circle_up", () => {
             goUp();
             playClickSound();
         }, '#f093fb', '#f5576c', "Go Up");
+
         createButton("arrow_circle_down", () => {
             goDown();
             playClickSound();
         }, '#667eea', '#764ba2', "Go Down");
+
         createButton("call_split", () => {
             splitNWay();
             playClickSound();
         }, '#ff9a9e', '#fecfef', "N-Way Split");
+
+        createButton("zoom_in", () => {
+            if (selectedDominoes.size > 0) {
+                selectedDominoes.forEach(domino => {
+                    const mesh = domino.group.children[0];
+                    mesh.scale.x *= 1.19;
+                    mesh.scale.y *= 1.19;
+
+                    mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                });
+                logAction("Enlarged Scale");
+            }
+            playClickSound();
+        }, '#84fab0', '#8fd3f4', "Enlarge");
 
         createButton("east", () => {
             if (selectedDominoes.size > 0) {
@@ -2117,26 +2276,6 @@
                 logAction("Moved Z +2");
             }
         }, '#a1c4fd', '#c2e9fb', "Move Z +2");
-
-        createButton("zoom_in", () => {
-            if (selectedDominoes.size > 0) {
-                selectedDominoes.forEach(domino => {
-                    const mesh = domino.group.children[0];
-                    mesh.scale.x *= 1.19;
-                    mesh.scale.y *= 1.19;
-
-                    mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
-                });
-                logAction("Enlarged Scale");
-            }
-            playClickSound();
-        }, '#84fab0', '#8fd3f4', "Enlarge");
-
-        // Undo Button
-        createButton("undo", () => {
-            undoLastAction();
-            playClickSound();
-        }, '#dfe9f3', '#ffffff', "Undo");
 
         // Cannon button removed as per user request
 
@@ -2185,18 +2324,18 @@
                                     activeDomino = null;
                                 }
                             }
-                            logAction(`Domino Deselected (ID: ${clickedDomino.id})`);
+                            logAction(`Domino Deselected(ID: ${clickedDomino.id})[Multi]`);
                         } else {
                             selectedDominoes.add(clickedDomino);
                             activeDomino = clickedDomino;
-                            logAction(`Domino Selected (ID: ${clickedDomino.id})`);
+                            logAction(`Domino Selected(ID: ${clickedDomino.id})[Multi]`);
                         }
                     } else {
                         // Single selection
                         selectedDominoes.clear();
                         selectedDominoes.add(clickedDomino);
                         activeDomino = clickedDomino;
-                        logAction(`Domino Selected (ID: ${clickedDomino.id})`);
+                        logAction(`Domino Selected(ID: ${clickedDomino.id})`);
                     }
 
                     selectedType = 'domino';
