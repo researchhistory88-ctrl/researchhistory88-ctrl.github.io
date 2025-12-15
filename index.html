@@ -120,9 +120,25 @@
             </select>
         </div>
         <div style="margin-top: 10px; pointer-events: auto;">
-            <label for="color-picker" style="margin-right: 10px;">Color:</label>
+            <label for="color-picker" style="margin-right: 10px;">Color 1:</label>
             <input type="color" id="color-picker" value="#ff6b6b"
-                style="padding: 0; border: none; border-radius: 4px; height: 30px; width: 50px;">
+                style="padding: 0; border: none; border-radius: 4px; height: 30px; width: 50px; vertical-align: middle;">
+        </div>
+        <div style="margin-top: 10px; pointer-events: auto;">
+            <label for="color-picker-2" style="margin-right: 10px;">Color 2:</label>
+            <input type="color" id="color-picker-2" value="#6e8efb"
+                style="padding: 0; border: none; border-radius: 4px; height: 30px; width: 50px; vertical-align: middle;">
+        </div>
+        <div style="margin-top: 10px; pointer-events: auto;">
+            <label style="margin-right: 10px;">
+                <input type="checkbox" id="gradation-check" style="vertical-align: middle;">
+                Gradation Mode
+            </label>
+        </div>
+        <div style="margin-top: 10px; pointer-events: auto;">
+            <label for="gradation-step" style="margin-right: 10px;">Gradation Step:</label>
+            <input type="number" id="gradation-step" min="1" max="100" value="10"
+                style="width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #ccc;">
         </div>
         <div style="margin-top: 10px; pointer-events: auto;">
             <div id="coord-display" style="background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px;">
@@ -626,6 +642,70 @@
         // let isFalling = false; // Managed per domino now
         const targetRotation = (80 * Math.PI) / 180; // 80 degrees
         let isRainbowMode = false; // Flag for rainbow coloring
+        let selectedType = 'domino'; // 'domino', 'ground', 'background', null
+
+        // Undo System
+        let undoStack = [];
+
+        function recordUndo(type, createdDominoes, previousSelection) {
+            undoStack.push({
+                type: type, // 'creation'
+                createdDominoes: createdDominoes, // Array of domino objects
+                previousSelection: previousSelection // Array of domino objects
+            });
+            // Limit stack size if needed, e.g., 50 actions
+            if (undoStack.length > 50) undoStack.shift();
+        }
+
+        function undoLastAction() {
+            if (undoStack.length === 0) {
+                console.log("Nothing to undo");
+                return;
+            }
+
+            const action = undoStack.pop();
+
+            if (action.type === 'creation') {
+                // remove created dominoes
+                action.createdDominoes.forEach(d => {
+                    // Remove from Scene
+                    scene.remove(d.group);
+
+                    // Remove from global array
+                    const index = dominoes.indexOf(d);
+                    if (index > -1) dominoes.splice(index, 1);
+
+                    // Remove from Parent's children list (Critical for graph graph)
+                    // We need to find parents. The created dominoes might be children of existing ones.
+                    // This is efficiently done by checking all dominoes or just knowing the parent?
+                    // Actually, 'd' is in 'children' array of some other 'parent'.
+                    dominoes.forEach(possibleParent => {
+                        const childIndex = possibleParent.children.indexOf(d);
+                        if (childIndex > -1) {
+                            possibleParent.children.splice(childIndex, 1);
+                        }
+                    });
+                });
+
+                // Restore selection
+                selectedDominoes.clear();
+                action.previousSelection.forEach(d => {
+                    // Check if d still exists (it should, unless we undid its creation previously, but stack order prevents that)
+                    if (dominoes.includes(d)) {
+                        selectedDominoes.add(d);
+                    }
+                });
+
+                if (selectedDominoes.size > 0) {
+                    activeDomino = Array.from(selectedDominoes).pop();
+                } else {
+                    activeDomino = null;
+                }
+
+                updateHighlights();
+                logAction("Undo Performed");
+            }
+        }
 
         // --- Scene Setup ---
         const scene = new THREE.Scene();
@@ -827,16 +907,7 @@
                 // Wait, ExtrudeGeometry extrudes along Z by default.
                 // geometry.center() centers it.
                 // We want the face that corresponds to the "front" or "back" of the extrusion to be the "Top" face in our domino context?
-                // In the previous code, we checked ny > 0.9.
-                // Let's verify orientation.
-                // createDominoAt rotates the group.
-                // The mesh is positioned at (0, height/2, -depth/2).
-                // The extrusion happens in Z.
-                // So the large faces are +Z and -Z.
-                // But wait, the previous code had:
-                // shape drawn in XY plane.
-                // Extruded in Z.
-                // Then checked normal Y?
+                // In the previous code, we checked normal Y?
                 // Ah, looking at previous code:
                 // shape.moveTo(-w, -h)...
                 // This draws in XY.
@@ -952,7 +1023,23 @@
             ctx.stroke();
         }
 
-        function createDominoAt(x, z, rotationY = 0) {
+        function getGradationColor(index, step) {
+            const c1Hex = document.getElementById('color-picker').value;
+            const c2Hex = document.getElementById('color-picker-2').value;
+            // t goes from 0 to 2*step-1
+            const t = index % (2 * step);
+            let f = t / step;
+            if (f > 1) {
+                f = 2 - f; // Going back
+            }
+
+            const c1 = new THREE.Color(c1Hex);
+            const c2 = new THREE.Color(c2Hex);
+            // Linear interpolation
+            return c1.lerp(c2, f).getStyle();
+        }
+
+        function createDominoAt(x, z, rotationY = 0, color = null) {
             const dominoGroup = new THREE.Group();
             // Ensure rotation order is YXZ so that X-rotation (falling) happens relative to Y-rotation (orientation)
             dominoGroup.rotation.order = 'YXZ';
@@ -973,8 +1060,8 @@
                 const hue = (dominoes.length * 0.05) % 1.0;
                 bodyMaterial.color.setHSL(hue, 1.0, 0.5);
             } else {
-                // Use current color from picker
-                const colorVal = document.getElementById('color-picker').value;
+                // Use provided color or current picker
+                const colorVal = color || document.getElementById('color-picker').value;
                 bodyMaterial = new THREE.MeshStandardMaterial({
                     color: colorVal,
                     roughness: 0.3,
@@ -1034,7 +1121,7 @@
 
 
 
-        function createFullyOrientedDomino(position, quaternion) {
+        function createFullyOrientedDomino(position, quaternion, color = null) {
             const dominoGroup = new THREE.Group();
             dominoGroup.rotation.order = 'YXZ';
             dominoGroup.position.copy(position);
@@ -1053,7 +1140,7 @@
                 const hue = (dominoes.length * 0.05) % 1.0;
                 bodyMaterial.color.setHSL(hue, 1.0, 0.5);
             } else {
-                const colorVal = document.getElementById('color-picker').value;
+                const colorVal = color || document.getElementById('color-picker').value;
                 bodyMaterial = new THREE.MeshStandardMaterial({
                     color: colorVal,
                     roughness: 0.3,
@@ -1097,8 +1184,8 @@
             return dominoObject;
         }
 
-        function createDomino(zPosition) {
-            return createDominoAt(0, zPosition, 0);
+        function createDomino(zPosition, color = null) {
+            return createDominoAt(0, zPosition, 0, color);
         }
 
         // Helper to update highlights
@@ -1149,10 +1236,16 @@
             if (selectedDominoes.size === 0) return;
 
             const newSelection = new Set();
+            const previousSelection = new Set(selectedDominoes); // Capture selection BEFORE modification
+            const createdDominoes = [];
+
             const currentSelection = Array.from(selectedDominoes);
 
             currentSelection.forEach(selectedDomino => {
                 let currentParent = selectedDomino;
+                let currentIndex = (currentParent.gradationIndex !== undefined) ? currentParent.gradationIndex : 0;
+                const isGradation = document.getElementById('gradation-check').checked;
+                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
 
                 for (let i = 0; i < 2; i++) {
                     const last = currentParent;
@@ -1164,8 +1257,14 @@
 
                     const newPos = lastPos.clone().add(forward.multiplyScalar(DOMINO_SPACING));
 
-                    const newDomino = createFullyOrientedDomino(newPos, lastQuat);
+                    currentIndex++;
+                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
+
+                    const newDomino = createFullyOrientedDomino(newPos, lastQuat, color);
+                    newDomino.gradationIndex = currentIndex;
+
                     dominoes.push(newDomino);
+                    createdDominoes.push(newDomino); // Add to created list
 
                     // Connect graph
                     last.children.push(newDomino);
@@ -1187,6 +1286,7 @@
             }
 
             updateHighlights();
+            recordUndo('creation', createdDominoes, previousSelection);
             logAction("Added Domino");
         }
 
@@ -1194,6 +1294,8 @@
             if (selectedDominoes.size === 0) return;
 
             const newSelection = new Set();
+            const previousSelection = new Set(selectedDominoes);
+            const createdDominoes = [];
             const currentSelection = Array.from(selectedDominoes);
             const radius = parseInt(document.getElementById('radius-select').value, 10);
 
@@ -1221,6 +1323,11 @@
 
                 let currentParent = last;
 
+                // Gradation Setup
+                let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                const isGradation = document.getElementById('gradation-check').checked;
+                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+
                 angles.forEach(deg => {
                     const rad = deg * (Math.PI / 180);
 
@@ -1232,8 +1339,13 @@
                     const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rad);
                     const newQuat = rotQuat.clone().multiply(lastQuat);
 
-                    const newDomino = createFullyOrientedDomino(newPos, newQuat);
+                    currentIndex++;
+                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                    const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                    newDomino.gradationIndex = currentIndex;
+
                     dominoes.push(newDomino);
+                    createdDominoes.push(newDomino); // Add to created list
 
                     // Connect graph
                     currentParent.children.push(newDomino);
@@ -1252,6 +1364,7 @@
             }
 
             updateHighlights();
+            recordUndo('creation', createdDominoes, previousSelection);
             logAction(`Turned Left (Radius: ${radius})`);
         }
 
@@ -1259,6 +1372,8 @@
             if (selectedDominoes.size === 0) return;
 
             const newSelection = new Set();
+            const previousSelection = new Set(selectedDominoes);
+            const createdDominoes = [];
             const currentSelection = Array.from(selectedDominoes);
             const radius = parseInt(document.getElementById('radius-select').value, 10);
 
@@ -1286,6 +1401,11 @@
 
                 let currentParent = last;
 
+                // Gradation Setup
+                let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                const isGradation = document.getElementById('gradation-check').checked;
+                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+
                 angles.forEach(deg => {
                     const rad = deg * (Math.PI / 180);
 
@@ -1299,8 +1419,13 @@
                     const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, -rad);
                     const newQuat = rotQuat.clone().multiply(lastQuat);
 
-                    const newDomino = createFullyOrientedDomino(newPos, newQuat);
+                    currentIndex++;
+                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                    const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                    newDomino.gradationIndex = currentIndex;
+
                     dominoes.push(newDomino);
+                    createdDominoes.push(newDomino); // Add to created list
 
                     // Connect graph
                     currentParent.children.push(newDomino);
@@ -1319,6 +1444,7 @@
             }
 
             updateHighlights();
+            recordUndo('creation', createdDominoes, previousSelection);
             logAction(`Turned Right (Radius: ${radius})`);
         }
 
@@ -1335,7 +1461,6 @@
         // Actually, to avoid redeclaration error if it IS global, I should rely on the existing one.
         // But if I can't find it, I might break it.
         // Let's assume it is global. If not, I'll add a fallback or check.
-        // Wait, I'll just use the value directly or check if defined.
         // Better: I will check the file for targetRotation definition first.
 
         function animate() {
@@ -1391,7 +1516,7 @@
                         const angleDiff = rot - angle45;
                         currentSpeed = animationSpeed * (angleDiff * 8);
                     } else if (rot < angle75) {
-                        const angleDiff = rot - angle60;
+                        const angleDiff = rot - angle45;
                         currentSpeed = animationSpeed * (angleDiff * 8);
                     } else {
                         const angleDiff = rot - angle75;
@@ -1517,8 +1642,8 @@
                 // Reset all
                 dominoes.forEach(d => {
                     if (d.animState) {
-                        d.group.position.copy(d.animState.initialPos);
                         d.group.quaternion.copy(d.animState.initialQuat);
+                        d.group.position.copy(d.animState.initialPos);
                         d.animState.currentFallAngle = 0;
                     }
                     d.isFalling = false;
@@ -1549,6 +1674,7 @@
         });
         colorPicker.addEventListener('input', (e) => {
             const colorVal = e.target.value;
+            // Priority: Dominoes > Ground > Background
             if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     const mesh = domino.group.children[0];
@@ -1559,6 +1685,12 @@
                     }
                 });
                 updateHighlights();
+            } else if (selectedType === 'ground') {
+                ground.material.color.set(colorVal);
+                logAction(`Ground Color Changed: ${colorVal}`);
+            } else if (selectedType === 'background') {
+                scene.background.set(colorVal);
+                logAction(`Background Color Changed: ${colorVal}`);
             }
         });
 
@@ -1600,26 +1732,9 @@
                 currentMaterial = selectedMaterial;
 
                 // Update selected dominoes if any, otherwise update all?
-                // User request: "Materialの変更をした場合には、選択中のドミノのMaterialを..."
-                // Implies: If there is a selection, update ONLY the selection.
-                // But previously it updated ALL dominoes.
-                // Let's assume: If selection exists -> Update Selection. Else -> Update All (or Future only? Previous code updated ALL).
-                // Previous code: `dominoes.forEach(...)`. This updates ALL.
-                // If I change it to update only selection, it changes behavior.
-                // But usually "Change Material" implies changing the "Current Tool Material" AND "Selected Objects".
-                // If no objects selected, it just changes tool.
-                // But the previous code explicitly updated ALL dominoes.
-                // "Update existing dominoes" comment confirms this.
-                // If I want to support "Update Selection", I should probably prioritize selection.
-                // If selection > 0, update selection.
-                // If selection == 0, update all? Or just future?
-                // The prompt says "Materialの変更をした場合には、選択中のドミノのMaterialwo" (truncated).
-                // Likely "Materialを更新してください" (Update the material of the selected dominoes).
-                // If I change the behavior to ONLY update selection, the user might lose the ability to bulk-update everything.
-                // But "Select All" (Ctrl+A equivalent) isn't there, but we have "Update All" behavior now.
-                // Let's implement:
-                // If selection > 0: Update ONLY selected dominoes.
-                // Else: Update ALL dominoes (keep existing behavior for backward compatibility/convenience).
+                // Consistent with material change logic:
+                // If selection > 0, update ONLY selected dominoes.
+                // Else, update ALL dominoes (keep existing behavior for backward compatibility/convenience).
 
                 const targetDominoes = selectedDominoes.size > 0 ? Array.from(selectedDominoes) : dominoes;
 
@@ -1710,6 +1825,8 @@
             if (selectedDominoes.size === 0) return;
 
             const newSelection = new Set();
+            const previousSelection = new Set(selectedDominoes);
+            const createdDominoes = [];
             const currentSelection = Array.from(selectedDominoes);
             const radius = parseInt(document.getElementById('radius-select').value, 10);
 
@@ -1732,6 +1849,11 @@
 
                 let currentParent = last;
 
+                // Gradation Setup
+                let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                const isGradation = document.getElementById('gradation-check').checked;
+                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+
                 // We start from step 1
                 for (let n = 1; n <= steps; n++) {
                     const ratio = n / steps;
@@ -1745,9 +1867,13 @@
                     const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, -theta);
                     const newQuat = rotQuat.clone().multiply(lastQuat);
 
-                    const newDomino = createFullyOrientedDomino(newPos, newQuat);
+                    currentIndex++;
+                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                    const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                    newDomino.gradationIndex = currentIndex;
 
                     dominoes.push(newDomino);
+                    createdDominoes.push(newDomino);
                     currentParent.children.push(newDomino);
                     currentParent = newDomino;
                 }
@@ -1764,6 +1890,7 @@
             }
 
             updateHighlights();
+            recordUndo('creation', createdDominoes, previousSelection);
             logAction(`Go Up (Radius: ${radius})`);
         }
 
@@ -1771,6 +1898,8 @@
             if (selectedDominoes.size === 0) return;
 
             const newSelection = new Set();
+            const previousSelection = new Set(selectedDominoes);
+            const createdDominoes = [];
             const currentSelection = Array.from(selectedDominoes);
             const radius = parseInt(document.getElementById('radius-select').value, 10);
 
@@ -1793,6 +1922,11 @@
 
                 let currentParent = last;
 
+                // Gradation Setup
+                let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                const isGradation = document.getElementById('gradation-check').checked;
+                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+
                 // We start from step 1
                 for (let n = 1; n <= steps; n++) {
                     const ratio = n / steps;
@@ -1806,9 +1940,13 @@
                     const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, theta);
                     const newQuat = rotQuat.clone().multiply(lastQuat);
 
-                    const newDomino = createFullyOrientedDomino(newPos, newQuat);
+                    currentIndex++;
+                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                    const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                    newDomino.gradationIndex = currentIndex;
 
                     dominoes.push(newDomino);
+                    createdDominoes.push(newDomino);
                     currentParent.children.push(newDomino);
                     currentParent = newDomino;
                 }
@@ -1825,6 +1963,7 @@
             }
 
             updateHighlights();
+            recordUndo('creation', createdDominoes, previousSelection);
             logAction(`Go Down (Radius: ${radius})`);
         }
 
@@ -1833,6 +1972,8 @@
 
             const targetN = parseInt(document.getElementById('n-way-select').value, 10);
             const newSelection = new Set();
+            const previousSelection = new Set(selectedDominoes);
+            const createdDominoes = [];
             const currentSelection = Array.from(selectedDominoes);
             const lateralSpacing = 1.2;
 
@@ -1847,8 +1988,8 @@
                 // Let's check turnLeft: Local Left (1,0,0). So my "Left" is X+.
                 // That means Right is X-.
                 // In splitNWay (previous): Right = (1,0,0) rotated Y.
-                // Wait, (1,0,0) is Right in standard Three.js?
-                // If I am looking down -Z: Right is -X.
+                // Wait, (1,0,0) is Left in standard Three.js?
+                // If I am looking down -Z: Right is +X.
                 // If I am looking down +Z (Forward): Right is -X?
                 // Standard Right-Hand Rule:
                 // X (Thumb) -> Right
@@ -1876,6 +2017,11 @@
                 let currentPos = lastPos.clone();
                 let currentLayer = [activeDomino];
 
+                // Gradation Setup
+                let currentIndex = (activeDomino.gradationIndex !== undefined) ? activeDomino.gradationIndex : 0;
+                const isGradation = document.getElementById('gradation-check').checked;
+                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+
                 for (let r = 2; r <= targetN; r++) {
                     const nextLayer = [];
                     const rowWidth = (r - 1) * lateralSpacing;
@@ -1884,13 +2030,19 @@
                     // Move forward for the new row
                     currentPos.add(forward.clone().multiplyScalar(DOMINO_SPACING));
 
+                    currentIndex++;
+                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
+
                     for (let i = 0; i < r; i++) {
                         const offset = startOffset + i * lateralSpacing;
                         // Calculate position: Center + Lateral * offset
                         const pos = currentPos.clone().add(lateral.clone().multiplyScalar(offset));
 
-                        const newDomino = createFullyOrientedDomino(pos, lastQuat);
+                        const newDomino = createFullyOrientedDomino(pos, lastQuat, color);
+                        newDomino.gradationIndex = currentIndex;
+
                         dominoes.push(newDomino);
+                        createdDominoes.push(newDomino); // Add to created list
                         nextLayer.push(newDomino);
 
                         // Connect parents
@@ -1918,6 +2070,7 @@
             }
 
             updateHighlights();
+            recordUndo('creation', createdDominoes, previousSelection);
             logAction(`Split ${targetN}-Way`);
         }
 
@@ -1979,6 +2132,12 @@
             playClickSound();
         }, '#84fab0', '#8fd3f4', "Enlarge");
 
+        // Undo Button
+        createButton("undo", () => {
+            undoLastAction();
+            playClickSound();
+        }, '#dfe9f3', '#ffffff', "Undo");
+
         // Cannon button removed as per user request
 
         // Handle window resize
@@ -1991,6 +2150,9 @@
 
         // Handle Click for Selection
         window.addEventListener('click', (event) => {
+            // Ignore clicks on UI elements (check if target is the canvas)
+            if (event.target !== renderer.domElement) return;
+
             // Calculate pointer position in normalized device coordinates (-1 to +1)
             pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
             pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -2037,18 +2199,35 @@
                         logAction(`Domino Selected (ID: ${clickedDomino.id})`);
                     }
 
+                    selectedType = 'domino';
                     updateHighlights();
                     break; // Stop after finding the first domino
+                } else if (object === ground) {
+                    // Ground Clicked
+                    clickedOnDomino = false; // Technically not a domino
+                    // But we want to handle ground selection specifically
                 }
             }
 
-            // If clicked on empty space (not on a domino), deselect all
-            // But only if the click was on the canvas, not on UI elements
-            if (!clickedOnDomino && event.target === renderer.domElement) {
-                selectedDominoes.clear();
-                activeDomino = null;
-                updateHighlights();
-                logAction("All Dominoes Deselected");
+            if (!clickedOnDomino) {
+                // Check if we hit ground specifically
+                const groundIntersect = intersects.find(i => i.object === ground);
+                if (groundIntersect) {
+                    selectedDominoes.clear();
+                    activeDomino = null;
+                    updateHighlights();
+                    selectedType = 'ground';
+                    logAction("Ground Selected");
+                } else {
+                    // Background (or nothing)
+                    if (event.target === renderer.domElement) {
+                        selectedDominoes.clear();
+                        activeDomino = null;
+                        updateHighlights();
+                        selectedType = 'background';
+                        logAction("Background Selected");
+                    }
+                }
             }
         });
 
@@ -2067,6 +2246,12 @@
                 }
                 updateHighlights();
                 logAction("All Dominoes Selected");
+            }
+
+            // Undo Shortcut (Ctrl+Z)
+            if (event.ctrlKey && (event.key === 'z' || event.key === 'Z')) {
+                event.preventDefault();
+                undoLastAction();
             }
         });
 
