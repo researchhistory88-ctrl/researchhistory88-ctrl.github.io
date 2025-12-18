@@ -128,6 +128,75 @@
             /* Span full width */
             width: 100%;
         }
+
+        /* Mobile Responsive UI */
+        @media screen and (max-width: 600px) or (orientation: portrait) {
+            #left-panel {
+                top: auto;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                max-height: 50vh;
+                padding: 10px;
+                box-sizing: border-box;
+                background: rgba(20, 20, 20, 0.9);
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 20px 20px 0 0;
+                overflow-x: hidden;
+            }
+
+            #button-container {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 8px;
+            }
+
+            #button-container button {
+                padding: 8px !important;
+            }
+
+            #parameters-container {
+                padding: 8px;
+                gap: 5px;
+            }
+
+            #parameters-container label {
+                font-size: 11px;
+            }
+
+            #parameters-container select,
+            #parameters-container input[type="number"] {
+                padding: 2px;
+                font-size: 12px;
+            }
+
+            #shape-canvas {
+                top: auto !important;
+                bottom: calc(50vh + 10px) !important;
+                left: 10px !important;
+                width: 100px !important;
+                height: 100px !important;
+            }
+
+            #history-log {
+                width: 90% !important;
+                left: 5% !important;
+                right: auto !important;
+                top: 80px !important;
+                max-height: 30vh !important;
+            }
+
+            #history-toggle-btn {
+                top: 15px !important;
+                right: 15px !important;
+                width: 36px !important;
+                height: 36px !important;
+            }
+
+            #info {
+                top: 10px;
+                font-size: 12px;
+            }
+        }
     </style>
     <!-- Import map for Three.js -->
     <script type="importmap">
@@ -249,6 +318,27 @@
         </div>
     </div>
 
+    <button id="history-toggle-btn" title="Toggle History" style="
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 44px;
+        height: 44px;
+        background: rgba(30, 30, 30, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 101;
+        backdrop-filter: blur(5px);
+        transition: transform 0.2s, background 0.2s;
+    ">
+        <span class="material-icons">history</span>
+    </button>
+
     <!-- History Log -->
     <div id="history-log" style="
         position: absolute;
@@ -256,7 +346,7 @@
         right: 20px;
         width: 300px;
         max-height: 400px;
-        display: flex;
+        display: none;
         flex-direction: column;
         background: rgba(255, 255, 255, 0.9);
         padding: 15px;
@@ -323,6 +413,26 @@
 
     <canvas id="shape-canvas" width="150" height="150"
         style="position: absolute; top: 10px; left: 10px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.5); pointer-events: none; border-radius: 8px;"></canvas>
+
+    <script>
+        const historyLog = document.getElementById('history-log');
+        const historyToggleBtn = document.getElementById('history-toggle-btn');
+
+        historyToggleBtn.addEventListener('click', () => {
+            const isHidden = historyLog.style.display === 'none' || historyLog.style.display === '';
+            historyLog.style.display = isHidden ? 'flex' : 'none';
+        });
+
+        // Hover effect for the toggle button
+        historyToggleBtn.addEventListener('mouseover', () => {
+            historyToggleBtn.style.transform = 'scale(1.1)';
+            historyToggleBtn.style.background = 'rgba(50, 50, 50, 0.9)';
+        });
+        historyToggleBtn.addEventListener('mouseout', () => {
+            historyToggleBtn.style.transform = 'scale(1)';
+            historyToggleBtn.style.background = 'rgba(30, 30, 30, 0.8)';
+        });
+    </script>
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
