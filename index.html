@@ -172,7 +172,37 @@
             grid-template-columns: 1fr 1fr !important;
         }
 
-        body.mobile-mode #parameters-container>div {
+        body.mobile-mode #color-gradation-group {
+            grid-column: 1 / span 1 !important;
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 4px !important;
+            align-items: center !important;
+            flex-wrap: nowrap !important;
+        }
+
+        body.mobile-mode #color-gradation-group>div {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 2px !important;
+        }
+
+        body.mobile-mode #color-gradation-group label {
+            font-size: 9px !important;
+            white-space: nowrap !important;
+        }
+
+        body.mobile-mode #color-gradation-group input[type="color"] {
+            width: 24px !important;
+            height: 24px !important;
+        }
+
+        body.mobile-mode #color-gradation-group input[type="checkbox"] {
+            margin: 0 2px 0 0 !important;
+        }
+
+        body.mobile-mode #parameters-container>div:not(#color-gradation-group) {
             flex-direction: column !important;
             align-items: flex-start !important;
             gap: 4px !important;
@@ -313,24 +343,27 @@
                 </select>
             </div>
 
-            <!-- 4. Color 1 -->
-            <div>
-                <label for="color-picker">Color 1:</label>
-                <input type="color" id="color-picker" value="#ff6b6b"
-                    style="padding: 0; border: none; height: 24px; width: 40px; cursor: pointer;">
-            </div>
+            <!-- Color and Gradation Group (for mobile left-side layout) -->
+            <div id="color-gradation-group">
+                <!-- 4. Color 1 -->
+                <div>
+                    <label for="color-picker">Color 1:</label>
+                    <input type="color" id="color-picker" value="#ff6b6b"
+                        style="padding: 0; border: none; height: 24px; width: 40px; cursor: pointer;">
+                </div>
 
-            <!-- 5. Color 2 -->
-            <div>
-                <label for="color-picker-2">Color 2:</label>
-                <input type="color" id="color-picker-2" value="#6e8efb"
-                    style="padding: 0; border: none; height: 24px; width: 40px; cursor: pointer;">
-            </div>
+                <!-- 5. Color 2 -->
+                <div>
+                    <label for="color-picker-2">Color 2:</label>
+                    <input type="color" id="color-picker-2" value="#6e8efb"
+                        style="padding: 0; border: none; height: 24px; width: 40px; cursor: pointer;">
+                </div>
 
-            <!-- 6. Gradation Mode -->
-            <div style="justify-content: flex-start;">
-                <input type="checkbox" id="gradation-check" style="margin-right: 8px;">
-                <label for="gradation-check" style="cursor: pointer;">Gradation Mode</label>
+                <!-- 6. Gradation Mode -->
+                <div style="justify-content: flex-start;">
+                    <input type="checkbox" id="gradation-check" style="margin-right: 8px;">
+                    <label for="gradation-check" style="cursor: pointer;">Gradation Mode</label>
+                </div>
             </div>
 
             <!-- 7. Gradation Step -->
@@ -492,7 +525,6 @@
     <script>
         const historyLog = document.getElementById('history-log');
         const historyToggleBtn = document.getElementById('history-toggle-btn');
-        const layoutToggleBtn = document.getElementById('layout-toggle-btn');
 
         historyToggleBtn.addEventListener('click', () => {
             const isHidden = historyLog.style.display === 'none' || historyLog.style.display === '';
@@ -509,21 +541,16 @@
             historyToggleBtn.style.background = 'rgba(30, 30, 30, 0.8)';
         });
 
-        // Layout Toggle Logic
-        layoutToggleBtn.addEventListener('click', () => {
-            document.body.classList.toggle('mobile-mode');
-            const isMobile = document.body.classList.contains('mobile-mode');
-            layoutToggleBtn.querySelector('.material-icons').textContent = isMobile ? 'desktop_windows' : 'stay_current_portrait';
-            layoutToggleBtn.title = isMobile ? 'Switch to Desktop Layout' : 'Toggle Mobile Layout';
+        // Layout Toggle Logic - moved to module script for camera access
+        // Hover effects only here
+        const layoutBtn = document.getElementById('layout-toggle-btn');
+        layoutBtn.addEventListener('mouseover', () => {
+            layoutBtn.style.transform = 'scale(1.1)';
+            layoutBtn.style.background = 'rgba(50, 50, 50, 0.9)';
         });
-
-        layoutToggleBtn.addEventListener('mouseover', () => {
-            layoutToggleBtn.style.transform = 'scale(1.1)';
-            layoutToggleBtn.style.background = 'rgba(50, 50, 50, 0.9)';
-        });
-        layoutToggleBtn.addEventListener('mouseout', () => {
-            layoutToggleBtn.style.transform = 'scale(1)';
-            layoutToggleBtn.style.background = 'rgba(30, 30, 30, 0.8)';
+        layoutBtn.addEventListener('mouseout', () => {
+            layoutBtn.style.transform = 'scale(1)';
+            layoutBtn.style.background = 'rgba(30, 30, 30, 0.8)';
         });
 
 
@@ -701,6 +728,8 @@
                 } else if (message.startsWith("Gradation Step:")) {
                     const step = parseInt(message.split(': ')[1], 10);
                     replayQueue.push({ type: 'setGradationStep', step: step });
+                } else if (message === "Selected All Dominoes") {
+                    replayQueue.push({ type: 'selectAll' });
                 }
             });
 
@@ -864,6 +893,14 @@
                         }
                         updateHighlights();
                         logAction(`Domino Deselected (ID: ${cmd.id})${cmd.isMulti ? ' [Multi]' : ''}`);
+                    }
+                    break;
+                case 'selectAll':
+                    if (dominoes.length > 0) {
+                        dominoes.forEach(d => selectedDominoes.add(d));
+                        activeDomino = dominoes[dominoes.length - 1];
+                        updateHighlights();
+                        logAction("Selected All Dominoes");
                     }
                     break;
                 case 'moveX':
@@ -1075,7 +1112,21 @@
         // scene.fog = new THREE.Fog(0x111111, 10, 50); // Removed fog to prevent darkness at distance
 
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000); // Increased far plane
-        camera.position.set(32.20, 32.20, 32.20);
+
+        // Mobile detection for initial camera position
+        const isMobileDevice = window.innerWidth <= 768;
+        if (isMobileDevice) {
+            camera.position.set(70.10, 44.78, 93.92);
+            document.body.classList.add('mobile-mode');
+            // Update layout toggle button icon
+            const layoutBtn = document.getElementById('layout-toggle-btn');
+            if (layoutBtn) {
+                layoutBtn.querySelector('.material-icons').textContent = 'desktop_windows';
+                layoutBtn.title = 'Switch to Desktop Layout';
+            }
+        } else {
+            camera.position.set(21.64, 28.29, 49.10);
+        }
         camera.lookAt(0, 0, 0);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -1086,6 +1137,35 @@
         // --- Controls ---
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
+
+        // Set initial orbit target based on mode
+        if (isMobileDevice) {
+            controls.target.set(5.26, -14.94, 6.51);
+        } else {
+            controls.target.set(-4.19, 0.16, 3.72);
+        }
+        controls.update();
+
+        // --- Layout Toggle with Camera Reset ---
+        const layoutToggleBtn = document.getElementById('layout-toggle-btn');
+        layoutToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('mobile-mode');
+            const isMobile = document.body.classList.contains('mobile-mode');
+
+            // Update button icon and title
+            layoutToggleBtn.querySelector('.material-icons').textContent = isMobile ? 'desktop_windows' : 'stay_current_portrait';
+            layoutToggleBtn.title = isMobile ? 'Switch to Desktop Layout' : 'Toggle Mobile Layout';
+
+            // Reset camera and target positions based on mode
+            if (isMobile) {
+                camera.position.set(70.10, 44.78, 93.92);
+                controls.target.set(5.26, -14.94, 6.51);
+            } else {
+                camera.position.set(21.64, 28.29, 49.10);
+                controls.target.set(-4.19, 0.16, 3.72);
+            }
+            controls.update();
+        });
 
         // --- Lighting ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // Increased intensity
@@ -1112,6 +1192,57 @@
         const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
         sunMesh.position.copy(dirLight.position);
         scene.add(sunMesh);
+
+        // --- Camera Position Marker ---
+        const cameraMarkerGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+        const cameraMarkerMaterial = new THREE.MeshBasicMaterial({
+            color: 0x0088ff,
+            transparent: true,
+            opacity: 0.8
+        });
+        const cameraMarker = new THREE.Mesh(cameraMarkerGeometry, cameraMarkerMaterial);
+        scene.add(cameraMarker);
+
+        // --- Orbit Target (Rotation Center) Marker ---
+        const targetMarkerGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+        const targetMarkerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.8
+        });
+        const targetMarker = new THREE.Mesh(targetMarkerGeometry, targetMarkerMaterial);
+        scene.add(targetMarker);
+
+        // Add crosshair lines for target
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
+        const lineLength = 2;
+
+        // X-axis line
+        const xLineGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(-lineLength, 0, 0),
+            new THREE.Vector3(lineLength, 0, 0)
+        ]);
+        const xLine = new THREE.Line(xLineGeometry, lineMaterial);
+
+        // Y-axis line
+        const yLineGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -lineLength, 0),
+            new THREE.Vector3(0, lineLength, 0)
+        ]);
+        const yLine = new THREE.Line(yLineGeometry, lineMaterial);
+
+        // Z-axis line
+        const zLineGeometry = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0, -lineLength),
+            new THREE.Vector3(0, 0, lineLength)
+        ]);
+        const zLine = new THREE.Line(zLineGeometry, lineMaterial);
+
+        const targetCrosshair = new THREE.Group();
+        targetCrosshair.add(xLine);
+        targetCrosshair.add(yLine);
+        targetCrosshair.add(zLine);
+        scene.add(targetCrosshair);
 
         // --- Ground ---
         // Diameter 50 -> Radius 25
@@ -1981,9 +2112,14 @@
 
             controls.update();
 
+            // Update marker positions
+            cameraMarker.position.copy(camera.position);
+            targetMarker.position.copy(controls.target);
+            targetCrosshair.position.copy(controls.target);
+
             const coordDisplay = document.getElementById('coord-display');
             if (coordDisplay) {
-                coordDisplay.textContent = `X: ${camera.position.x.toFixed(2)} Y: ${camera.position.y.toFixed(2)} Z: ${camera.position.z.toFixed(2)}`;
+                coordDisplay.innerHTML = `Camera: X: ${camera.position.x.toFixed(2)} Y: ${camera.position.y.toFixed(2)} Z: ${camera.position.z.toFixed(2)}<br>Target: X: ${controls.target.x.toFixed(2)} Y: ${controls.target.y.toFixed(2)} Z: ${controls.target.z.toFixed(2)}`;
             }
 
             renderer.render(scene, camera);
