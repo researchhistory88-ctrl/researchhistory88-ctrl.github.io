@@ -728,6 +728,8 @@
                 } else if (message.startsWith("Gradation Step:")) {
                     const step = parseInt(message.split(': ')[1], 10);
                     replayQueue.push({ type: 'setGradationStep', step: step });
+                } else if (message === "Undo Performed") {
+                    replayQueue.push({ type: 'undo' });
                 } else if (message === "Selected All Dominoes") {
                     replayQueue.push({ type: 'selectAll' });
                 }
@@ -953,6 +955,9 @@
                         logAction("Enlarged Scale");
                     }
                     break;
+                case 'undo':
+                    undoLastAction();
+                    break;
             }
             lastReplayCommandType = cmd.type; // Track for next command's selection behavior
         }
@@ -1042,6 +1047,17 @@
         const targetRotation = (80 * Math.PI) / 180; // 80 degrees
         let isRainbowMode = false; // Flag for rainbow coloring
         let selectedType = 'domino'; // 'domino', 'ground', 'background', null
+
+        let isExhibitionMode = false;
+        const exhibitionGlassMaterial = new THREE.MeshPhysicalMaterial({
+            transmission: 1.0,
+            thickness: 2.0,
+            metalness: 0.0,
+            roughness: 0.0,
+            ior: 1.5,
+            emissive: 0x223344,
+            emissiveIntensity: 0.2
+        });
 
         // Undo System
         let undoStack = [];
@@ -1978,6 +1994,13 @@
                     // Initialize animation state if not present
                     if (domino.animState === undefined) {
 
+                        // Exhibition Mode: Revert material before falling
+                        if (isExhibitionMode && domino.userData && domino.userData.originalMaterial) {
+                            domino.group.children[0].material = domino.userData.originalMaterial;
+                            // Keep userData.originalMaterial in case we need to re-apply glass on reset? 
+                            // Actually reset clears isExhibitionMode, so we fully restore.
+                        }
+
                         let fallDir = 1;
 
                         // Priority 1: Momentum (Inherited from parent trigger)
@@ -2143,6 +2166,7 @@
                         d.group.quaternion.copy(d.animState.initialQuat);
                         d.group.position.copy(d.animState.initialPos);
                         d.animState.currentFallAngle = 0;
+                        d.animState = undefined; // Force re-initialization on next run
                     }
                     d.isFalling = false;
                     d.fallen = false;
@@ -2150,7 +2174,20 @@
                     d.triggeredNext = false;
                     d.isBlocked = false;
                     d.suggestedFallDirection = undefined;
+                    d.suggestedFallDirection = undefined;
                 });
+
+                // Exhibition Mode Reset
+                if (isExhibitionMode) {
+                    dominoes.forEach(d => {
+                        if (d.userData && d.userData.originalMaterial) {
+                            d.group.children[0].material = d.userData.originalMaterial;
+                            d.userData.originalMaterial = null;
+                        }
+                    });
+                    isExhibitionMode = false;
+                }
+
                 logAction("Animation Reset");
             }
         });
@@ -2653,7 +2690,40 @@
                 });
                 logAction("Moved Z +2");
             }
+            playClickSound();
         }, '#a1c4fd', '#c2e9fb', "Move Z +2");
+
+        // Exhibition Button
+        createButton("visibility", () => {
+            // Reset if currently falling
+            if (dominoes.length > 0 && dominoes[0].isFalling) {
+                // Trigger reset via start button click or manual reset
+                document.getElementById('start-btn').click();
+                return;
+            }
+
+            isExhibitionMode = true;
+
+            // Apply Glass Material
+            dominoes.forEach(d => {
+                const mesh = d.group.children[0];
+                // Check if userData exists on domino object, if not create it
+                if (!d.userData) d.userData = {};
+
+                // Store original if not already stored
+                if (!d.userData.originalMaterial) {
+                    d.userData.originalMaterial = mesh.material;
+                }
+                mesh.material = [exhibitionGlassMaterial, blackMaterial];
+            });
+
+            // Start Animation
+            if (dominoes.length > 0) {
+                dominoes[0].isFalling = true;
+                logAction("Exhibition Started");
+            }
+
+        }, '#9C27B0', '#7B1FA2', 'Exhibition Mode');
 
         // Cannon button removed as per user request
 
