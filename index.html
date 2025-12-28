@@ -281,7 +281,7 @@
     <div id="info">
         <div style="margin-top: 10px; pointer-events: auto;">
             <div id="coord-display" style="background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px;">
-                X: 0.00 Y: 0.00 Z: 0.00
+                X: 0.00 Y: 0.00 Z: 0.00 | Depth: 1
             </div>
         </div>
     </div>
@@ -325,6 +325,29 @@
                         radiusSelect.appendChild(option);
                     }
                 </script>
+            </div>
+
+            <!-- Spiral Mode -->
+            <div>
+                <input type="checkbox" id="spiral-check" style="margin-right: 8px;">
+                <label for="spiral-check" style="cursor: pointer; font-size: 13px;">Archimedean spiral</label>
+                <select id="spiral-direction"
+                    style="margin-left: 8px; width: 40px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
+                    <option value="-">-</option>
+                    <option value="+">+</option>
+                </select>
+            </div>
+
+            <!-- Multi Selection Mode -->
+            <div>
+                <input type="checkbox" id="multi-select-check" style="margin-right: 8px;">
+                <label for="multi-select-check" style="cursor: pointer;">Multi Selection</label>
+            </div>
+
+            <!-- Descendants Selection Mode -->
+            <div>
+                <input type="checkbox" id="descendants-check" style="margin-right: 8px;">
+                <label for="descendants-check" style="cursor: pointer;">Descendants</label>
             </div>
 
             <!-- 3. N-Way -->
@@ -380,7 +403,7 @@
                     <option value="rounded">Rounded</option>
                     <option value="circle">Circle</option>
                     <option value="diamond">Diamond</option>
-                    <option value="heart">Heart</option>
+                    <option value="petal">Petal</option>
                 </select>
             </div>
 
@@ -675,16 +698,25 @@
                 if (message === "Added Domino") {
                     replayQueue.push({ type: 'addDomino' });
                 } else if (message.startsWith("Turned Left")) {
-                    const radius = parseInt(message.match(/Radius: (\d+)/)[1], 10);
-                    replayQueue.push({ type: 'turnLeft', radius: radius });
+                    const match = message.match(/Radius: (\d+)/);
+                    if (match) {
+                        const radius = parseInt(match[1], 10);
+                        replayQueue.push({ type: 'turnLeft', radius: radius });
+                    }
                 } else if (message.startsWith("Turned Right")) {
-                    const radius = parseInt(message.match(/Radius: (\d+)/)[1], 10);
-                    replayQueue.push({ type: 'turnRight', radius: radius });
+                    const match = message.match(/Radius: (\d+)/);
+                    if (match) {
+                        const radius = parseInt(match[1], 10);
+                        replayQueue.push({ type: 'turnRight', radius: radius });
+                    }
                 } else if (message === "Split Two-Way") {
                     replayQueue.push({ type: 'splitTwoWay' });
                 } else if (message.startsWith("Split") && message.endsWith("-Way")) {
-                    const n = parseInt(message.match(/Split (\d+)-Way/)[1], 10);
-                    replayQueue.push({ type: 'splitNWay', n: n });
+                    const match = message.match(/Split (\d+)\s*-Way/);
+                    if (match) {
+                        const n = parseInt(match[1], 10);
+                        replayQueue.push({ type: 'splitNWay', n: n });
+                    }
                 } else if (message.startsWith("Color Changed:")) {
                     const color = message.split(': ')[1];
                     replayQueue.push({ type: 'setColor', color: color });
@@ -705,16 +737,21 @@
                 } else if (message === "Animation Reset") {
                     replayQueue.push({ type: 'resetAnimation' });
                 } else if (message.startsWith("Domino Selected")) {
-                    const idMatch = message.match(/ID: (\d+)/);
+                    const idMatch = message.match(/ID:\s*(\d+)/);
                     if (idMatch) {
                         const id = parseInt(idMatch[1], 10);
                         const isMulti = message.includes("[Multi]");
-                        replayQueue.push({ type: 'selectDomino', id: id, isMulti: isMulti });
+                        const isDescendants = message.includes("+ descendants");
+                        replayQueue.push({ type: 'selectDomino', id: id, isMulti: isMulti, isDescendants: isDescendants });
                     }
-                } else if (message.startsWith("Domino Deselected (ID:")) {
-                    const id = parseInt(message.match(/ID: (\d+)/)[1], 10);
-                    const isMulti = message.includes("[Multi]");
-                    replayQueue.push({ type: 'deselectDomino', id: id, isMulti: isMulti });
+                } else if (message.startsWith("Domino Deselected")) {
+                    const idMatch = message.match(/ID:\s*(\d+)/);
+                    if (idMatch) {
+                        const id = parseInt(idMatch[1], 10);
+                        const isMulti = message.includes("[Multi]");
+                        const isDescendants = message.includes("+ descendants");
+                        replayQueue.push({ type: 'deselectDomino', id: id, isMulti: isMulti, isDescendants: isDescendants });
+                    }
                 } else if (message === "Moved X +2") {
                     replayQueue.push({ type: 'moveX' });
                 } else if (message === "Moved Z +2") {
@@ -745,6 +782,53 @@
                     replayQueue.push({ type: 'undo' });
                 } else if (message === "Selected All Dominoes") {
                     replayQueue.push({ type: 'selectAll' });
+                } else if (message === "Ground Selected") {
+                    replayQueue.push({ type: 'selectGround' });
+                } else if (message === "Background Selected") {
+                    replayQueue.push({ type: 'selectBackground' });
+                } else if (message === "Exhibition Started") {
+                    replayQueue.push({ type: 'startExhibition' });
+                } else if (message.startsWith("Ground Color Changed:")) {
+                    const color = message.split(': ')[1];
+                    replayQueue.push({ type: 'setGroundColor', color: color });
+                } else if (message.startsWith("Background Color Changed:")) {
+                    const color = message.split(': ')[1];
+                    replayQueue.push({ type: 'setBackgroundColor', color: color });
+                } else if (message.startsWith("Geometry set to")) {
+                    const match = message.match(/Geometry set to (\w+)/);
+                    if (match) {
+                        replayQueue.push({ type: 'setGeometry', geometry: match[1] });
+                    }
+                } else if (message.startsWith("Spiral Mode:")) {
+                    const match = message.match(/Spiral Mode: (On|Off)(?: \(([\+\-]+)\))?/);
+                    if (match) {
+                        replayQueue.push({
+                            type: 'setSpiralMode',
+                            enabled: match[1] === 'On',
+                            direction: match[2]
+                        });
+                    }
+                } else if (message.startsWith("Spiral Direction:")) {
+                    const match = message.match(/Spiral Direction: ([\+\-]+)/);
+                    if (match) {
+                        replayQueue.push({
+                            type: 'setSpiralMode',
+                            enabled: true,
+                            direction: match[1]
+                        });
+                    }
+                } else if (message.startsWith("Multi Selection Mode:")) {
+                    const enabled = message.includes("On");
+                    replayQueue.push({ type: 'setMultiSelectMode', enabled: enabled });
+                } else if (message.startsWith("Descendants Mode:")) {
+                    const enabled = message.includes("On");
+                    replayQueue.push({ type: 'setDescendantsMode', enabled: enabled });
+                } else if (message.startsWith("Up/Down Mode:")) {
+                    const enabled = message.includes("On");
+                    replayQueue.push({ type: 'setUpDownMode', enabled: enabled });
+                } else if (message.startsWith("Up/Down Offset:")) {
+                    const offset = parseFloat(message.split(': ')[1]);
+                    replayQueue.push({ type: 'setUpDownOffset', offset: offset });
                 }
             });
 
@@ -858,7 +942,9 @@
                     document.getElementById('material-select').dispatchEvent(new Event('change'));
                     break;
                 case 'setGeometry':
-                    document.getElementById('geometry-select').value = cmd.geometry;
+                    let geom = cmd.geometry;
+                    if (geom === 'heart') geom = 'petal';
+                    document.getElementById('geometry-select').value = geom;
                     document.getElementById('geometry-select').dispatchEvent(new Event('change'));
                     break;
                 case 'setSpeed':
@@ -889,25 +975,56 @@
                 case 'selectDomino':
                     const dominoToSelect = dominoes.find(d => d.id === cmd.id);
                     if (dominoToSelect) {
-                        // If NOT isMulti, clear selection first.
+                        const targets = new Set();
+                        targets.add(dominoToSelect);
+                        if (cmd.isDescendants) {
+                            const addDescendants = (d) => {
+                                if (d.children) {
+                                    d.children.forEach(child => {
+                                        if (!targets.has(child)) {
+                                            targets.add(child);
+                                            addDescendants(child);
+                                        }
+                                    });
+                                }
+                            };
+                            addDescendants(dominoToSelect);
+                        }
+
                         if (!cmd.isMulti) {
                             selectedDominoes.clear();
                         }
-                        selectedDominoes.add(dominoToSelect);
+                        targets.forEach(t => selectedDominoes.add(t));
                         activeDomino = dominoToSelect;
                         updateHighlights();
-                        logAction(`Domino Selected (ID: ${cmd.id})${cmd.isMulti ? ' [Multi]' : ''}`);
+                        logAction(`Domino Selected (ID: ${cmd.id}${cmd.isDescendants ? ' + descendants' : ''})${cmd.isMulti ? ' [Multi]' : ''}`);
                     }
                     break;
                 case 'deselectDomino':
                     const dominoToDeselect = dominoes.find(d => d.id === cmd.id);
                     if (dominoToDeselect) {
-                        selectedDominoes.delete(dominoToDeselect);
-                        if (activeDomino === dominoToDeselect) {
+                        const targets = new Set();
+                        targets.add(dominoToDeselect);
+                        if (cmd.isDescendants) {
+                            const addDescendants = (d) => {
+                                if (d.children) {
+                                    d.children.forEach(child => {
+                                        if (!targets.has(child)) {
+                                            targets.add(child);
+                                            addDescendants(child);
+                                        }
+                                    });
+                                }
+                            };
+                            addDescendants(dominoToDeselect);
+                        }
+
+                        targets.forEach(t => selectedDominoes.delete(t));
+                        if (activeDomino === dominoToDeselect || !selectedDominoes.has(activeDomino)) {
                             activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
                         }
                         updateHighlights();
-                        logAction(`Domino Deselected (ID: ${cmd.id})${cmd.isMulti ? ' [Multi]' : ''}`);
+                        logAction(`Domino Deselected (ID: ${cmd.id}${cmd.isDescendants ? ' + descendants' : ''})${cmd.isMulti ? ' [Multi]' : ''}`);
                     }
                     break;
                 case 'selectAll':
@@ -970,6 +1087,47 @@
                     break;
                 case 'undo':
                     undoLastAction();
+                    break;
+                case 'selectGround':
+                    selectedDominoes.clear();
+                    activeDomino = null;
+                    selectedType = 'ground';
+                    updateHighlights();
+                    break;
+                case 'selectBackground':
+                    selectedDominoes.clear();
+                    activeDomino = null;
+                    selectedType = 'background';
+                    updateHighlights();
+                    break;
+                case 'startExhibition':
+                    startExhibition();
+                    break;
+                case 'setGroundColor':
+                    ground.material.color.set(cmd.color);
+                    document.getElementById('color-picker').value = cmd.color;
+                    break;
+                case 'setBackgroundColor':
+                    scene.background.set(cmd.color);
+                    document.getElementById('color-picker').value = cmd.color;
+                    break;
+                case 'setSpiralMode':
+                    document.getElementById('spiral-check').checked = cmd.enabled;
+                    if (cmd.direction) {
+                        document.getElementById('spiral-direction').value = cmd.direction;
+                    }
+                    break;
+                case 'setMultiSelectMode':
+                    document.getElementById('multi-select-check').checked = cmd.enabled;
+                    break;
+                case 'setDescendantsMode':
+                    document.getElementById('descendants-check').checked = cmd.enabled;
+                    break;
+                case 'setUpDownMode':
+                    document.getElementById('updown-mode-check').checked = cmd.enabled;
+                    break;
+                case 'setUpDownOffset':
+                    document.getElementById('updown-offset').value = cmd.offset;
                     break;
             }
             lastReplayCommandType = cmd.type; // Track for next command's selection behavior
@@ -1209,7 +1367,7 @@
         const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
         const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
         sunMesh.position.copy(dirLight.position);
-        scene.add(sunMesh);
+        // scene.add(sunMesh);
 
         // --- Camera Position Marker ---
         const cameraMarkerGeometry = new THREE.SphereGeometry(0.5, 16, 16);
@@ -1229,7 +1387,7 @@
             opacity: 0.8
         });
         const targetMarker = new THREE.Mesh(targetMarkerGeometry, targetMarkerMaterial);
-        scene.add(targetMarker);
+        // scene.add(targetMarker);
 
         // Add crosshair lines for target
         const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
@@ -1260,7 +1418,7 @@
         targetCrosshair.add(xLine);
         targetCrosshair.add(yLine);
         targetCrosshair.add(zLine);
-        scene.add(targetCrosshair);
+        // scene.add(targetCrosshair);
 
         // --- Ground ---
         // Diameter 50 -> Radius 25
@@ -1349,7 +1507,7 @@
                 shape.lineTo(0, -h);
                 shape.lineTo(-w, 0);
                 shape.lineTo(0, h);
-            } else if (type === 'heart') {
+            } else if (type === 'petal') {
                 // Heart shape logic
                 const x = 0, y = 0;
                 // Scale factor to fit within width/height
@@ -1359,7 +1517,7 @@
                 shape.bezierCurveTo(x + w, y + h, x + 2.0 * s, y - 1.0 * s, x, y - h);
                 shape.bezierCurveTo(x - 2.0 * s, y - 1.0 * s, x - w, y + h, x, y + h);
 
-                // Center the heart vertically roughly
+                // Center the petal vertically roughly
                 // The above drawing is centered around (0,0) but slightly offset
             } else {
                 // Standard or Rounded
@@ -1509,7 +1667,7 @@
                 ctx.lineTo(tx(0), ty(-h));
                 ctx.lineTo(tx(-w), ty(0));
                 ctx.lineTo(tx(0), ty(h));
-            } else if (type === 'heart') {
+            } else if (type === 'petal') {
                 const x = 0, y = 0;
                 const s = Math.min(w, h) / 2.5;
 
@@ -1621,7 +1779,8 @@
                 isFalling: false,
                 fallen: false,
                 isBlocked: false,
-                children: []
+                children: [],
+                depth: 1
             };
 
             // Link mesh back to object for raycasting
@@ -1688,7 +1847,8 @@
                 isFalling: false,
                 fallen: false,
                 isBlocked: false,
-                children: []
+                children: [],
+                depth: 1
             };
 
             dominoMesh.userData.domino = dominoObject;
@@ -1727,6 +1887,7 @@
 
         // Add initial domino
         const initialDomino = createDomino(0);
+        initialDomino.depth = 1;
         dominoes.push(initialDomino);
 
         activeDomino = initialDomino;
@@ -1780,7 +1941,9 @@
                     const color = isGradation ? getGradationColor(currentIndex, step) : null;
 
                     const newDomino = createFullyOrientedDomino(newPos, lastQuat, color);
+                    newDomino.depth = last.depth + 1;
                     newDomino.gradationIndex = currentIndex;
+                    newDomino.depth = last.depth + 1;
 
                     dominoes.push(newDomino);
                     createdDominoes.push(newDomino); // Add to created list
@@ -1835,49 +1998,155 @@
                 // Vector from Center to LastPos
                 const startVec = lastPos.clone().sub(center);
 
-                const angles = [];
-                for (let n = 1; n <= radius + 1; n++) {
-                    angles.push(n * 90 / (radius + 1));
-                }
-
                 let currentParent = last;
+                const isSpiral = document.getElementById('spiral-check').checked;
 
-                // Gradation Setup
-                let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                const isGradation = document.getElementById('gradation-check').checked;
-                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                if (isSpiral) {
+                    const spiralDirection = document.getElementById('spiral-direction').value;
+                    const r0 = radius;
+                    const totalTheta = 6 * Math.PI;
+                    let currentTheta = 0;
+                    let spiralStepIndex = 0;
 
-                const isUpDown = document.getElementById('updown-mode-check').checked;
-                const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+                    // Gradation Setup
+                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                    const isGradation = document.getElementById('gradation-check').checked;
+                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                    const isUpDown = document.getElementById('updown-mode-check').checked;
+                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                angles.forEach((deg, index) => {
-                    const rad = deg * (Math.PI / 180);
+                    const targetSpacing = 1.0;
 
-                    // Rotate startVec by 'rad' around Local Up axis (CCW)
-                    const newVec = startVec.clone().applyAxisAngle(localUp, rad);
-                    let newPos = center.clone().add(newVec);
+                    if (spiralDirection === '+') {
+                        // Outward Spiral: Center is lastPos, starts from θ=0, r=0
+                        const center = lastPos.clone();
+                        const k = r0 / totalTheta;
+                        const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
 
-                    if (isUpDown) {
-                        // Apply offset based on step index (index + 1 because we skip degree 0)
-                        newPos.add(localUp.clone().multiplyScalar(yOffset * (index + 1)));
+                        // Start from θ that gives r ~ targetSpacing
+                        currentTheta = (k > 0) ? targetSpacing / k : 0.1;
+
+                        while (currentTheta < totalTheta) {
+                            const currentR = k * currentTheta;
+
+                            // Approximate dS = k * sqrt(theta^2 + 1) * dTheta
+                            const dSToDTheta = k * Math.sqrt(currentTheta * currentTheta + 1);
+                            const dTheta = targetSpacing / dSToDTheta;
+
+                            const nextVec = localForward.clone().applyAxisAngle(localUp, currentTheta).multiplyScalar(currentR);
+                            let nextPos = center.clone().add(nextVec);
+
+                            if (isUpDown) {
+                                nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                            }
+
+                            // Correct Tangent Direction
+                            const rotAngle = currentTheta + Math.atan(currentTheta);
+                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
+                            const newQuat = rotQuat.clone().multiply(lastQuat);
+
+                            currentIndex++;
+                            const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                            const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                            newDomino.gradationIndex = currentIndex;
+                            newDomino.depth = currentParent.depth + 1;
+
+                            dominoes.push(newDomino);
+                            createdDominoes.push(newDomino);
+
+                            currentParent.children.push(newDomino);
+                            currentParent = newDomino;
+                            spiralStepIndex++;
+
+                            currentTheta += dTheta;
+                        }
+                    } else {
+                        // Inward Spiral: Center is at distance radius, spirals to center
+                        while (currentTheta < totalTheta - 0.1) {
+                            const currentR = r0 * (1 - currentTheta / totalTheta);
+                            if (currentR < 0.2) break; // Too close to center
+
+                            // Approximate dS = sqrt( (dr/dTheta)^2 + r^2 ) * dTheta
+                            const drDTheta = -r0 / totalTheta;
+                            const dSToDTheta = Math.sqrt(drDTheta * drDTheta + currentR * currentR);
+                            const dTheta = targetSpacing / dSToDTheta;
+
+                            currentTheta += dTheta;
+                            if (currentTheta > totalTheta) break;
+
+                            const nextR = r0 * (1 - currentTheta / totalTheta);
+
+                            const nextVec = startVec.clone().setLength(nextR).applyAxisAngle(localUp, currentTheta);
+                            let nextPos = center.clone().add(nextVec);
+
+                            if (isUpDown) {
+                                nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                            }
+
+                            const rotAngle = currentTheta + Math.atan((r0 / totalTheta) / nextR);
+                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
+                            const newQuat = rotQuat.clone().multiply(lastQuat);
+
+                            currentIndex++;
+                            const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                            const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                            newDomino.gradationIndex = currentIndex;
+                            newDomino.depth = currentParent.depth + 1;
+
+                            dominoes.push(newDomino);
+                            createdDominoes.push(newDomino);
+
+                            currentParent.children.push(newDomino);
+                            currentParent = newDomino;
+                            spiralStepIndex++;
+                        }
+                    }
+                } else {
+                    const angles = [];
+                    for (let n = 1; n <= radius + 1; n++) {
+                        angles.push(n * 90 / (radius + 1));
                     }
 
-                    // New Rotation: Rotate original quaternion around local up
-                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rad);
-                    const newQuat = rotQuat.clone().multiply(lastQuat);
 
-                    currentIndex++;
-                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                    const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
-                    newDomino.gradationIndex = currentIndex;
 
-                    dominoes.push(newDomino);
-                    createdDominoes.push(newDomino); // Add to created list
+                    // Gradation Setup
+                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                    const isGradation = document.getElementById('gradation-check').checked;
+                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
 
-                    // Connect graph
-                    currentParent.children.push(newDomino);
-                    currentParent = newDomino;
-                });
+                    const isUpDown = document.getElementById('updown-mode-check').checked;
+                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+
+                    angles.forEach((deg, index) => {
+                        const rad = deg * (Math.PI / 180);
+
+                        // Rotate startVec by 'rad' around Local Up axis (CCW)
+                        const newVec = startVec.clone().applyAxisAngle(localUp, rad);
+                        let newPos = center.clone().add(newVec);
+
+                        if (isUpDown) {
+                            // Apply offset based on step index (index + 1 because we skip degree 0)
+                            newPos.add(localUp.clone().multiplyScalar(yOffset * (index + 1)));
+                        }
+
+                        // New Rotation: Rotate original quaternion around local up
+                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rad);
+                        const newQuat = rotQuat.clone().multiply(lastQuat);
+
+                        currentIndex++;
+                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                        newDomino.gradationIndex = currentIndex;
+                        newDomino.depth = currentParent.depth + 1;
+
+                        dominoes.push(newDomino);
+                        createdDominoes.push(newDomino); // Add to created list
+
+                        // Connect graph
+                        currentParent.children.push(newDomino);
+                        currentParent = newDomino;
+                    });
+                }
                 newSelection.add(currentParent);
             });
 
@@ -1921,49 +2190,157 @@
                 // Vector from Center to LastPos
                 const startVec = lastPos.clone().sub(center);
 
-                const angles = [];
-                for (let n = 1; n <= radius + 1; n++) {
-                    angles.push(n * 90 / (radius + 1));
-                }
-
                 let currentParent = last;
+                const isSpiral = document.getElementById('spiral-check').checked;
 
-                // Gradation Setup
-                let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                const isGradation = document.getElementById('gradation-check').checked;
-                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                if (isSpiral) {
+                    const spiralDirection = document.getElementById('spiral-direction').value;
+                    const r0 = radius;
+                    const totalTheta = 6 * Math.PI;
+                    let currentTheta = 0;
+                    let spiralStepIndex = 0;
 
-                const isUpDown = document.getElementById('updown-mode-check').checked;
-                const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+                    // Gradation Setup
+                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                    const isGradation = document.getElementById('gradation-check').checked;
+                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                    const isUpDown = document.getElementById('updown-mode-check').checked;
+                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                angles.forEach((deg, index) => {
-                    const rad = deg * (Math.PI / 180);
+                    const targetSpacing = 1.0;
 
-                    // Rotate startVec by '-rad' (CW) around Local Up
-                    const newVec = startVec.clone().applyAxisAngle(localUp, -rad);
-                    let newPos = center.clone().add(newVec);
+                    if (spiralDirection === '+') {
+                        // Outward Spiral: Center is lastPos, starts from θ=0, r=0
+                        const center = lastPos.clone();
+                        const k = r0 / totalTheta;
+                        const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
 
-                    if (isUpDown) {
-                        // Apply offset based on step index
-                        newPos.add(localUp.clone().multiplyScalar(yOffset * (index + 1)));
+                        // Start from θ that gives r ~ targetSpacing
+                        currentTheta = (k > 0) ? targetSpacing / k : 0.1;
+
+                        while (currentTheta < totalTheta) {
+                            const currentR = k * currentTheta;
+
+                            // Approximate dS = k * sqrt(theta^2 + 1) * dTheta
+                            const dSToDTheta = k * Math.sqrt(currentTheta * currentTheta + 1);
+                            const dTheta = targetSpacing / dSToDTheta;
+
+                            // CW rotation uses -currentTheta
+                            const nextVec = localForward.clone().applyAxisAngle(localUp, -currentTheta).multiplyScalar(currentR);
+                            let nextPos = center.clone().add(nextVec);
+
+                            if (isUpDown) {
+                                nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                            }
+
+                            // Correct Tangent Direction
+                            const rotAngle = -(currentTheta + Math.atan(currentTheta));
+                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
+                            const newQuat = rotQuat.clone().multiply(lastQuat);
+
+                            currentIndex++;
+                            const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                            const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                            newDomino.gradationIndex = currentIndex;
+                            newDomino.depth = currentParent.depth + 1;
+
+                            dominoes.push(newDomino);
+                            createdDominoes.push(newDomino);
+
+                            currentParent.children.push(newDomino);
+                            currentParent = newDomino;
+                            spiralStepIndex++;
+
+                            currentTheta += dTheta;
+                        }
+                    } else {
+                        // Inward Spiral: Center is at distance radius, spirals to center (CW)
+                        while (currentTheta < totalTheta - 0.1) {
+                            const currentR = r0 * (1 - currentTheta / totalTheta);
+                            if (currentR < 0.2) break;
+
+                            const drDTheta = -r0 / totalTheta;
+                            const dSToDTheta = Math.sqrt(drDTheta * drDTheta + currentR * currentR);
+                            const dTheta = targetSpacing / dSToDTheta;
+
+                            currentTheta += dTheta;
+                            if (currentTheta > totalTheta) break;
+
+                            const nextR = r0 * (1 - currentTheta / totalTheta);
+
+                            // CW rotation uses -currentTheta
+                            const nextVec = startVec.clone().setLength(nextR).applyAxisAngle(localUp, -currentTheta);
+                            let nextPos = center.clone().add(nextVec);
+
+                            if (isUpDown) {
+                                nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                            }
+
+                            // Correct Tangent Direction
+                            const rotAngle = -(currentTheta + Math.atan((r0 / totalTheta) / nextR));
+                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
+                            const newQuat = rotQuat.clone().multiply(lastQuat);
+
+                            currentIndex++;
+                            const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                            const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                            newDomino.gradationIndex = currentIndex;
+                            newDomino.depth = currentParent.depth + 1;
+
+                            dominoes.push(newDomino);
+                            createdDominoes.push(newDomino);
+
+                            currentParent.children.push(newDomino);
+                            currentParent = newDomino;
+                            spiralStepIndex++;
+                        }
+                    }
+                } else {
+                    const angles = [];
+                    for (let n = 1; n <= radius + 1; n++) {
+                        angles.push(n * 90 / (radius + 1));
                     }
 
-                    // New Rotation: Rotate original quaternion around local up by -rad
-                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, -rad);
-                    const newQuat = rotQuat.clone().multiply(lastQuat);
 
-                    currentIndex++;
-                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                    const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
-                    newDomino.gradationIndex = currentIndex;
 
-                    dominoes.push(newDomino);
-                    createdDominoes.push(newDomino); // Add to created list
+                    // Gradation Setup
+                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                    const isGradation = document.getElementById('gradation-check').checked;
+                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
 
-                    // Connect graph
-                    currentParent.children.push(newDomino);
-                    currentParent = newDomino;
-                });
+                    const isUpDown = document.getElementById('updown-mode-check').checked;
+                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+
+                    angles.forEach((deg, index) => {
+                        const rad = deg * (Math.PI / 180);
+
+                        // Rotate startVec by '-rad' (CW) around Local Up
+                        const newVec = startVec.clone().applyAxisAngle(localUp, -rad);
+                        let newPos = center.clone().add(newVec);
+
+                        if (isUpDown) {
+                            // Apply offset based on step index
+                            newPos.add(localUp.clone().multiplyScalar(yOffset * (index + 1)));
+                        }
+
+                        // New Rotation: Rotate original quaternion around local up by -rad
+                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, -rad);
+                        const newQuat = rotQuat.clone().multiply(lastQuat);
+
+                        currentIndex++;
+                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                        newDomino.gradationIndex = currentIndex;
+                        newDomino.depth = currentParent.depth + 1;
+
+                        dominoes.push(newDomino);
+                        createdDominoes.push(newDomino); // Add to created list
+
+                        // Connect graph
+                        currentParent.children.push(newDomino);
+                        currentParent = newDomino;
+                    });
+                }
                 newSelection.add(currentParent);
             });
 
@@ -2166,7 +2543,11 @@
 
             const coordDisplay = document.getElementById('coord-display');
             if (coordDisplay) {
-                coordDisplay.innerHTML = `Camera: X: ${camera.position.x.toFixed(2)} Y: ${camera.position.y.toFixed(2)} Z: ${camera.position.z.toFixed(2)}<br>Target: X: ${controls.target.x.toFixed(2)} Y: ${controls.target.y.toFixed(2)} Z: ${controls.target.z.toFixed(2)}`;
+                let text = `Camera: X: ${camera.position.x.toFixed(2)} Y: ${camera.position.y.toFixed(2)} Z: ${camera.position.z.toFixed(2)}<br>Target: X: ${controls.target.x.toFixed(2)} Y: ${controls.target.y.toFixed(2)} Z: ${controls.target.z.toFixed(2)}`;
+                if (activeDomino) {
+                    text += `<br>Selected Domino Depth: ${activeDomino.depth || 'N/A'}`;
+                }
+                coordDisplay.innerHTML = text;
             }
 
             renderer.render(scene, camera);
@@ -2354,9 +2735,42 @@
             logAction(`Gradation Mode: ${e.target.checked ? 'On' : 'Off'}`);
         });
 
+        // Spiral Mode Listener
+        document.getElementById('spiral-check').addEventListener('change', (e) => {
+            const direction = document.getElementById('spiral-direction').value;
+            logAction(`Spiral Mode: ${e.target.checked ? 'On' : 'Off'} (${direction})`);
+        });
+
+        document.getElementById('spiral-direction').addEventListener('change', (e) => {
+            const isSpiral = document.getElementById('spiral-check').checked;
+            if (isSpiral) {
+                logAction(`Spiral Direction: ${e.target.value}`);
+            }
+        });
+
+        // Multi Selection Mode Listener
+        document.getElementById('multi-select-check').addEventListener('change', (e) => {
+            logAction(`Multi Selection Mode: ${e.target.checked ? 'On' : 'Off'}`);
+        });
+
+        // Descendants Selection Mode Listener
+        document.getElementById('descendants-check').addEventListener('change', (e) => {
+            logAction(`Descendants Mode: ${e.target.checked ? 'On' : 'Off'}`);
+        });
+
         // Gradation Step Listener
         document.getElementById('gradation-step').addEventListener('input', (e) => {
             logAction(`Gradation Step: ${e.target.value}`);
+        });
+
+        // Up/Down Mode Listener
+        document.getElementById('updown-mode-check').addEventListener('change', (e) => {
+            logAction(`Up/Down Mode: ${e.target.checked ? 'On' : 'Off'}`);
+        });
+
+        // Up/Down Offset Listener
+        document.getElementById('updown-offset').addEventListener('input', (e) => {
+            logAction(`Up/Down Offset: ${e.target.value}`);
         });
 
         // Add "Add Domino" button
@@ -2453,6 +2867,7 @@
                     const color = isGradation ? getGradationColor(currentIndex, step) : null;
                     const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
                     newDomino.gradationIndex = currentIndex;
+                    newDomino.depth = currentParent.depth + 1;
 
                     dominoes.push(newDomino);
                     createdDominoes.push(newDomino);
@@ -2534,6 +2949,7 @@
                     const color = isGradation ? getGradationColor(currentIndex, step) : null;
                     const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
                     newDomino.gradationIndex = currentIndex;
+                    newDomino.depth = currentParent.depth + 1;
 
                     dominoes.push(newDomino);
                     createdDominoes.push(newDomino);
@@ -2637,6 +3053,7 @@
 
                         const newDomino = createFullyOrientedDomino(pos, lastQuat, color);
                         newDomino.gradationIndex = currentIndex;
+                        newDomino.depth = currentLayer[0].depth + 1;
 
                         dominoes.push(newDomino);
                         createdDominoes.push(newDomino); // Add to created list
@@ -2668,7 +3085,7 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction(`Split ${targetN} -Way`);
+            logAction(`Split ${targetN}-Way`);
         }
 
         createButton("add_box", () => {
@@ -2740,8 +3157,7 @@
             playClickSound();
         }, '#a1c4fd', '#c2e9fb', "Move Z +2");
 
-        // Exhibition Button
-        createButton("visibility", () => {
+        function startExhibition() {
             // Reset if currently falling
             if (dominoes.length > 0 && dominoes[0].isFalling) {
                 // Trigger reset via start button click or manual reset
@@ -2769,7 +3185,11 @@
                 dominoes[0].isFalling = true;
                 logAction("Exhibition Started");
             }
+        }
 
+        // Exhibition Button
+        createButton("visibility", () => {
+            startExhibition();
         }, '#9C27B0', '#7B1FA2', 'Exhibition Mode');
 
         // Cannon button removed as per user request
@@ -2800,46 +3220,65 @@
 
             for (let i = 0; i < intersects.length; i++) {
                 const object = intersects[i].object;
-                // Check if the object is part of a domino
-                // Check if the object is part of a domino
                 if (object.userData.domino) {
                     clickedOnDomino = true;
                     const clickedDomino = object.userData.domino;
 
-                    if (event.ctrlKey) {
-                        // Toggle selection
-                        if (selectedDominoes.has(clickedDomino)) {
-                            selectedDominoes.delete(clickedDomino);
-                            // If we deselected the active one, update activeDomino
-                            if (activeDomino === clickedDomino) {
-                                // Set to the last one in the set, or null
-                                if (selectedDominoes.size > 0) {
-                                    activeDomino = Array.from(selectedDominoes).pop();
-                                } else {
-                                    activeDomino = null;
-                                }
+                    const isMultiMode = event.ctrlKey || document.getElementById('multi-select-check').checked;
+                    const isDescendantsMode = document.getElementById('descendants-check').checked;
+
+                    const targets = new Set();
+                    targets.add(clickedDomino);
+
+                    if (isDescendantsMode) {
+                        const addDescendants = (d) => {
+                            if (d.children) {
+                                d.children.forEach(child => {
+                                    if (!targets.has(child)) {
+                                        targets.add(child);
+                                        addDescendants(child);
+                                    }
+                                });
                             }
-                            logAction(`Domino Deselected(ID: ${clickedDomino.id})[Multi]`);
+                        };
+                        addDescendants(clickedDomino);
+                    }
+
+                    if (isMultiMode) {
+                        // Toggle selection based on the clicked domino
+                        const isRemoving = selectedDominoes.has(clickedDomino);
+
+                        targets.forEach(t => {
+                            if (isRemoving) {
+                                selectedDominoes.delete(t);
+                            } else {
+                                selectedDominoes.add(t);
+                            }
+                        });
+
+                        // Update activeDomino
+                        if (isRemoving) {
+                            if (activeDomino === clickedDomino || !selectedDominoes.has(activeDomino)) {
+                                activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
+                            }
+                            logAction(`Domino Deselected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''}) [Multi]`);
                         } else {
-                            selectedDominoes.add(clickedDomino);
                             activeDomino = clickedDomino;
-                            logAction(`Domino Selected(ID: ${clickedDomino.id})[Multi]`);
+                            logAction(`Domino Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''}) [Multi]`);
                         }
                     } else {
-                        // Single selection
+                        // Single selection (or single branch selection)
                         selectedDominoes.clear();
-                        selectedDominoes.add(clickedDomino);
+                        targets.forEach(t => selectedDominoes.add(t));
                         activeDomino = clickedDomino;
-                        logAction(`Domino Selected(ID: ${clickedDomino.id})`);
+                        logAction(`Domino Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''})`);
                     }
 
                     selectedType = 'domino';
                     updateHighlights();
-                    break; // Stop after finding the first domino
+                    break;
                 } else if (object === ground) {
-                    // Ground Clicked
-                    clickedOnDomino = false; // Technically not a domino
-                    // But we want to handle ground selection specifically
+                    clickedOnDomino = false;
                 }
             }
 
