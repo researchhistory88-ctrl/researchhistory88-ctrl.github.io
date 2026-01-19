@@ -283,26 +283,47 @@
             <div id="coord-display" style="background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px;">
                 X: 0.00 Y: 0.00 Z: 0.00 | Depth: 1
             </div>
+            <div id="stats-display"
+                style="background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px; margin-top: 5px; font-size: 13px;">
+                Max Depth: 1 | Spheres: 1 | Width: 0.00
+            </div>
         </div>
     </div>
 
     <!-- Left Panel -->
     <div id="left-panel">
         <div id="button-container">
-            <button id="start-btn">Push Domino</button>
+            <button id="start-btn">Spark Sphere</button>
             <button id="select-all-btn" title="Select All" style="
                 background: rgba(255, 255, 255, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                color: white;
-                padding: 8px;
+                border: none;
                 border-radius: 8px;
+                color: white;
                 cursor: pointer;
+                width: 44px;
+                height: 44px;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 transition: background 0.2s;
             ">
                 <span class="material-icons">select_all</span>
+            </button>
+            <button id="select-edges-btn" title="Select Edges (Spheres with no children)" style="
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 8px;
+                color: white;
+                cursor: pointer;
+                width: 44px;
+                height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s;
+                margin-left: 5px;
+            ">
+                <span class="material-icons">mediation</span>
             </button>
         </div>
 
@@ -325,6 +346,30 @@
                         radiusSelect.appendChild(option);
                     }
                 </script>
+            </div>
+
+            <script>
+                document.getElementById('branch-select').addEventListener('change', (e) => {
+                    logAction(`Branch Parameter: ${e.target.value}`);
+                });
+            </script>
+
+            <!-- Branch Parameter -->
+            <div>
+                <label for="branch-select">Branch:</label>
+                <select id="branch-select" style="width: 60px;">
+                    <option value="1" selected>1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="6">6</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="12">12</option>
+                    <option value="18">18</option>
+                    <option value="36">36</option>
+                </select>
             </div>
 
             <!-- Spiral Mode -->
@@ -371,7 +416,7 @@
                 <!-- 4. Color 1 -->
                 <div>
                     <label for="color-picker">Color 1:</label>
-                    <input type="color" id="color-picker" value="#ff6b6b"
+                    <input type="color" id="color-picker" value="#2ff207"
                         style="padding: 0; border: none; height: 24px; width: 40px; cursor: pointer;">
                 </div>
 
@@ -698,16 +743,20 @@
                 if (message === "Added Domino") {
                     replayQueue.push({ type: 'addDomino' });
                 } else if (message.startsWith("Turned Left")) {
-                    const match = message.match(/Radius: (\d+)/);
-                    if (match) {
-                        const radius = parseInt(match[1], 10);
-                        replayQueue.push({ type: 'turnLeft', radius: radius });
+                    const radiusMatch = message.match(/Radius: (\d+)/);
+                    const branchMatch = message.match(/Branch: (\d+)/);
+                    if (radiusMatch) {
+                        const radius = parseInt(radiusMatch[1], 10);
+                        const branch = branchMatch ? parseInt(branchMatch[1], 10) : 1;
+                        replayQueue.push({ type: 'turnLeft', radius: radius, branch: branch });
                     }
                 } else if (message.startsWith("Turned Right")) {
-                    const match = message.match(/Radius: (\d+)/);
-                    if (match) {
-                        const radius = parseInt(match[1], 10);
-                        replayQueue.push({ type: 'turnRight', radius: radius });
+                    const radiusMatch = message.match(/Radius: (\d+)/);
+                    const branchMatch = message.match(/Branch: (\d+)/);
+                    if (radiusMatch) {
+                        const radius = parseInt(radiusMatch[1], 10);
+                        const branch = branchMatch ? parseInt(branchMatch[1], 10) : 1;
+                        replayQueue.push({ type: 'turnRight', radius: radius, branch: branch });
                     }
                 } else if (message === "Split Two-Way") {
                     replayQueue.push({ type: 'splitTwoWay' });
@@ -762,15 +811,19 @@
                     replayQueue.push({ type: 'enlargeScale' });
                 } else if (message.startsWith("Go Up")) {
                     const radiusMatch = message.match(/Radius: (\d+)/);
+                    const branchMatch = message.match(/Branch: (\d+)/);
                     if (radiusMatch) {
                         const radius = parseInt(radiusMatch[1], 10);
-                        replayQueue.push({ type: 'goUp', radius: radius });
+                        const branch = branchMatch ? parseInt(branchMatch[1], 10) : 1;
+                        replayQueue.push({ type: 'goUp', radius: radius, branch: branch });
                     }
                 } else if (message.startsWith("Go Down")) {
                     const radiusMatch = message.match(/Radius: (\d+)/);
+                    const branchMatch = message.match(/Branch: (\d+)/);
                     if (radiusMatch) {
                         const radius = parseInt(radiusMatch[1], 10);
-                        replayQueue.push({ type: 'goDown', radius: radius });
+                        const branch = branchMatch ? parseInt(branchMatch[1], 10) : 1;
+                        replayQueue.push({ type: 'goDown', radius: radius, branch: branch });
                     }
                 } else if (message.startsWith("Gradation Mode:")) {
                     const enabled = message.includes("On");
@@ -782,6 +835,8 @@
                     replayQueue.push({ type: 'undo' });
                 } else if (message === "Selected All Dominoes") {
                     replayQueue.push({ type: 'selectAll' });
+                } else if (message === "Selected Edge Dominoes") {
+                    replayQueue.push({ type: 'selectEdges' });
                 } else if (message === "Ground Selected") {
                     replayQueue.push({ type: 'selectGround' });
                 } else if (message === "Background Selected") {
@@ -812,11 +867,13 @@
                     const match = message.match(/Spiral Direction: ([\+\-]+)/);
                     if (match) {
                         replayQueue.push({
-                            type: 'setSpiralMode',
-                            enabled: true,
+                            type: 'setSpiralDirection',
                             direction: match[1]
                         });
                     }
+                } else if (message.startsWith("Branch Parameter:")) {
+                    const branch = parseInt(message.split(': ')[1], 10);
+                    replayQueue.push({ type: 'setBranch', branch: branch });
                 } else if (message.startsWith("Multi Selection Mode:")) {
                     const enabled = message.includes("On");
                     replayQueue.push({ type: 'setMultiSelectMode', enabled: enabled });
@@ -886,6 +943,25 @@
             }
         });
 
+        // Select Edges Logic
+        document.getElementById('select-edges-btn').addEventListener('click', () => {
+            if (dominoes.length > 0) {
+                selectedDominoes.clear();
+                dominoes.forEach(d => {
+                    if (d.children && d.children.length === 0) {
+                        selectedDominoes.add(d);
+                    }
+                });
+                if (selectedDominoes.size > 0) {
+                    activeDomino = Array.from(selectedDominoes).pop();
+                } else {
+                    activeDomino = null;
+                }
+                updateHighlights();
+                logAction("Selected Edge Dominoes");
+            }
+        });
+
         // Hover effect for the select-all button
         const selectAllBtn = document.getElementById('select-all-btn');
         selectAllBtn.addEventListener('mouseover', () => {
@@ -897,6 +973,17 @@
             selectAllBtn.style.transform = 'scale(1)';
         });
 
+        // Hover effect for the select-edges button
+        const selectEdgesBtn = document.getElementById('select-edges-btn');
+        selectEdgesBtn.addEventListener('mouseover', () => {
+            selectEdgesBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+            selectEdgesBtn.style.transform = 'scale(1.1)';
+        });
+        selectEdgesBtn.addEventListener('mouseout', () => {
+            selectEdgesBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            selectEdgesBtn.style.transform = 'scale(1)';
+        });
+
         function executeCommand(cmd) {
             switch (cmd.type) {
                 case 'addDomino':
@@ -904,23 +991,30 @@
                     break;
                 case 'turnLeft':
                     document.getElementById('radius-select').value = cmd.radius;
+                    document.getElementById('branch-select').value = cmd.branch || 1;
                     turnLeft();
                     break;
                 case 'turnRight':
                     document.getElementById('radius-select').value = cmd.radius;
+                    document.getElementById('branch-select').value = cmd.branch || 1;
                     turnRight();
                     break;
                 case 'goUp':
                     document.getElementById('radius-select').value = cmd.radius;
+                    document.getElementById('branch-select').value = cmd.branch || 1;
                     goUp();
                     break;
                 case 'goDown':
                     document.getElementById('radius-select').value = cmd.radius;
+                    document.getElementById('branch-select').value = cmd.branch || 1;
                     goDown();
                     break;
                 case 'splitNWay':
                     document.getElementById('n-way-select').value = cmd.n;
                     splitNWay();
+                    break;
+                case 'setBranch':
+                    document.getElementById('branch-select').value = cmd.branch;
                     break;
                 case 'setColor':
                     document.getElementById('color-picker').value = cmd.color;
@@ -1035,6 +1129,19 @@
                         logAction("Selected All Dominoes");
                     }
                     break;
+                case 'selectEdges':
+                    if (dominoes.length > 0) {
+                        selectedDominoes.clear();
+                        dominoes.forEach(d => {
+                            if (d.children && d.children.length === 0) {
+                                selectedDominoes.add(d);
+                            }
+                        });
+                        activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
+                        updateHighlights();
+                        logAction("Selected Edge Dominoes");
+                    }
+                    break;
                 case 'moveX':
                     if (selectedDominoes.size > 0) {
                         selectedDominoes.forEach(domino => {
@@ -1089,10 +1196,7 @@
                     undoLastAction();
                     break;
                 case 'selectGround':
-                    selectedDominoes.clear();
-                    activeDomino = null;
-                    selectedType = 'ground';
-                    updateHighlights();
+                    // Ground removed in index2.html
                     break;
                 case 'selectBackground':
                     selectedDominoes.clear();
@@ -1104,8 +1208,7 @@
                     startExhibition();
                     break;
                 case 'setGroundColor':
-                    ground.material.color.set(cmd.color);
-                    document.getElementById('color-picker').value = cmd.color;
+                    // Ground removed in index2.html
                     break;
                 case 'setBackgroundColor':
                     scene.background.set(cmd.color);
@@ -1228,7 +1331,6 @@
                 createdDominoes: createdDominoes, // Array of domino objects
                 previousSelection: previousSelection // Array of domino objects
             });
-            // Limit stack size if needed, e.g., 50 actions
             if (undoStack.length > 50) undoStack.shift();
         }
 
@@ -1250,10 +1352,7 @@
                     const index = dominoes.indexOf(d);
                     if (index > -1) dominoes.splice(index, 1);
 
-                    // Remove from Parent's children list (Critical for graph graph)
-                    // We need to find parents. The created dominoes might be children of existing ones.
-                    // This is efficiently done by checking all dominoes or just knowing the parent?
-                    // Actually, 'd' is in 'children' array of some other 'parent'.
+                    // Remove from Parent's children list
                     dominoes.forEach(possibleParent => {
                         const childIndex = possibleParent.children.indexOf(d);
                         if (childIndex > -1) {
@@ -1265,7 +1364,6 @@
                 // Restore selection
                 selectedDominoes.clear();
                 action.previousSelection.forEach(d => {
-                    // Check if d still exists (it should, unless we undid its creation previously, but stack order prevents that)
                     if (dominoes.includes(d)) {
                         selectedDominoes.add(d);
                     }
@@ -1278,8 +1376,36 @@
                 }
 
                 updateHighlights();
+                updateGlobalStats();
                 logAction("Undo Performed");
             }
+        }
+
+        const statsDisplay = document.getElementById('stats-display');
+
+        function updateGlobalStats() {
+            if (!statsDisplay) return;
+            if (dominoes.length === 0) {
+                statsDisplay.textContent = `Max Depth: 0 | Spheres: 0 | Max Width: 0`;
+                return;
+            }
+
+            let maxDepth = 0;
+            const depthCounts = {};
+
+            dominoes.forEach(d => {
+                if (d.depth > maxDepth) maxDepth = d.depth;
+                depthCounts[d.depth] = (depthCounts[d.depth] || 0) + 1;
+            });
+
+            let maxWidth = 0;
+            for (const depth in depthCounts) {
+                if (depthCounts[depth] > maxWidth) {
+                    maxWidth = depthCounts[depth];
+                }
+            }
+
+            statsDisplay.textContent = `Max Depth: ${maxDepth} | Spheres: ${dominoes.length} | Max Width: ${maxWidth}`;
         }
 
         // --- Scene Setup ---
@@ -1420,53 +1546,12 @@
         targetCrosshair.add(zLine);
         // scene.add(targetCrosshair);
 
-        // --- Ground ---
-        // Diameter 50 -> Radius 25
-        const groundGeo = new THREE.CircleGeometry(25, 64);
-        const groundMat = new THREE.MeshStandardMaterial({ color: GROUND_COLOR, roughness: 0.1, metalness: 0.5 });
-        const ground = new THREE.Mesh(groundGeo, groundMat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        scene.add(ground);
+        // --- Ground Removed ---
 
         const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
         // scene.add(gridHelper); // Removed to clip grid to circle
 
-        // Create Grid Texture
-        const canvas = document.createElement('canvas');
-        canvas.width = 64;
-        canvas.height = 64;
-        const context = canvas.getContext('2d');
-        context.strokeStyle = '#444444'; // Grid line color
-        context.lineWidth = 1;
-        context.beginPath();
-        context.moveTo(0, 0);
-        context.lineTo(64, 0);
-        context.moveTo(0, 0);
-        context.lineTo(0, 64);
-        context.stroke();
-
-        const gridTexture = new THREE.CanvasTexture(canvas);
-        gridTexture.wrapS = THREE.RepeatWrapping;
-        gridTexture.wrapT = THREE.RepeatWrapping;
-        gridTexture.repeat.set(25, 25); // 50 units diameter / 2 (UV radius 0.5) -> Wait. UV spans 0..1. Diameter is 50. So 50 repeats.
-
-        // Correction: CircleGeometry UVs span 0..1 bounding box.
-        // Diameter is 50 units. We want 1 unit per grid cell.
-        // So we need 50 cells across the texture.
-        gridTexture.repeat.set(50, 50);
-
-        const gridMaterial = new THREE.MeshBasicMaterial({
-            map: gridTexture,
-            transparent: true,
-            opacity: 0.5,
-            side: THREE.DoubleSide
-        });
-
-        const gridMesh = new THREE.Mesh(groundGeo, gridMaterial);
-        gridMesh.rotation.x = -Math.PI / 2;
-        gridMesh.position.y = 0.01; // Slightly above ground to avoid z-fighting
-        scene.add(gridMesh);
+        // Grid Removed
 
         // --- Axes Helper ---
         // Removed as per user request
@@ -1738,28 +1823,20 @@
                 });
             }
 
-            // Create material array: [Body, Top(Black)]
-            const materialsArray = [
-                bodyMaterial, // Index 0: Body
-                blackMaterial // Index 1: Top
-            ];
+            // Create sphere instead of domino
+            const sphereGeo = new THREE.SphereGeometry(0.1, 32, 32);
+            const sphereMat = bodyMaterial.clone(); // Clone to animate individually
 
-            const dominoMesh = new THREE.Mesh(geometry, [bodyMaterial, blackMaterial]);
+            const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
 
-            // Adjust mesh position so that the pivot point (0,0,0 of group) is at the bottom-center-front edge
-            // The geometry is centered at (0,0,0) by default (if center() was called) or based on shape.
-            // Our shape is centered at (0,0). Extrude depth is centered if we didn't specify otherwise?
-            // ExtrudeGeometry creates mesh with Z from 0 to depth usually? No, it depends.
-            // Let's assume we need to lift it up by height/2 and move back by depth/2?
-            // Wait, previous code had:
-            // dominoMesh.position.set(0, DOMINO_HEIGHT / 2, -DOMINO_DEPTH / 2);
-            // This suggests the geometry origin is at the center of the face, but Z is 0..depth?
-            // Let's keep the previous offset logic for now.
-            dominoMesh.position.set(0, DOMINO_HEIGHT / 2, -DOMINO_DEPTH / 2);
+            sphereMesh.position.set(0, 0.1, 0); // Center at radius height
+            sphereMesh.visible = true;
+            sphereMesh.scale.set(1, 1, 1);
 
-            dominoMesh.castShadow = true;
-            dominoMesh.receiveShadow = true;
-            dominoGroup.add(dominoMesh);
+            sphereMesh.castShadow = true;
+            sphereMesh.receiveShadow = true;
+            dominoGroup.add(sphereMesh);
+            const dominoMesh = sphereMesh; // Keep naming for remaining logic
 
             // Store metadata
             const dominoId = dominoIdCounter++;
@@ -1780,7 +1857,10 @@
                 fallen: false,
                 isBlocked: false,
                 children: [],
-                depth: 1
+                depth: 1,
+                isSparking: false,
+                sparkTime: 0,
+                exploded: false
             };
 
             // Link mesh back to object for raycasting
@@ -1818,17 +1898,17 @@
                 });
             }
 
-            const blackMaterial = new THREE.MeshStandardMaterial({
-                color: 0x000000,
-                roughness: 0.8
-            });
+            // Create sphere instead of domino
+            const sphereGeo = new THREE.SphereGeometry(0.1, 32, 32);
+            const sphereMesh = new THREE.Mesh(sphereGeo, bodyMaterial.clone());
+            sphereMesh.position.set(0, 0.1, 0); // Center at radius height
+            sphereMesh.visible = true;
+            sphereMesh.scale.set(1, 1, 1);
 
-            const dominoMesh = new THREE.Mesh(geometry, [bodyMaterial, blackMaterial]);
-            dominoMesh.position.set(0, DOMINO_HEIGHT / 2, -DOMINO_DEPTH / 2);
-
-            dominoMesh.castShadow = true;
-            dominoMesh.receiveShadow = true;
-            dominoGroup.add(dominoMesh);
+            sphereMesh.castShadow = true;
+            sphereMesh.receiveShadow = true;
+            dominoGroup.add(sphereMesh);
+            const dominoMesh = sphereMesh; // Keep naming for remaining logic
 
             const dominoId = dominoIdCounter++;
             dominoMesh.userData = {
@@ -1848,7 +1928,10 @@
                 fallen: false,
                 isBlocked: false,
                 children: [],
-                depth: 1
+                depth: 1,
+                isSparking: false,
+                sparkTime: 0,
+                exploded: false
             };
 
             dominoMesh.userData.domino = dominoObject;
@@ -1863,36 +1946,35 @@
         function updateHighlights() {
             dominoes.forEach(d => {
                 const mesh = d.group.children[0];
-                const materials = mesh.material; // Array of materials
+                const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
 
                 if (selectedDominoes.has(d)) {
-                    // Active domino: Glow (Yellow-Green) on Body faces
-                    // Index 0 is Body, Index 1 is Top
-                    if (materials[0]) {
-                        materials[0].emissive.setHex(0x66cc00);
-                        materials[0].emissiveIntensity = 1.0;
+                    // Selected dominoes: Glow (Red) on Body faces
+                    if (mat) {
+                        mat.emissive.setHex(0xff0000);
+                        mat.emissiveIntensity = 1.0;
                     }
                 } else {
-                    // Others: Restore base emissive
-                    const baseColor = mesh.userData.baseEmissive !== undefined ? mesh.userData.baseEmissive : 0x000000;
-                    const baseIntensity = mesh.userData.baseEmissiveIntensity !== undefined ? mesh.userData.baseEmissiveIntensity : 1.0;
-
-                    if (materials[0]) {
-                        materials[0].emissive.setHex(baseColor);
-                        materials[0].emissiveIntensity = baseIntensity;
+                    // Normal state: Reset emissive to base value
+                    if (mat) {
+                        const baseColor = d.group.children[0].userData.baseEmissive || 0x000000;
+                        const baseIntensity = d.group.children[0].userData.baseEmissiveIntensity || 0.0;
+                        mat.emissive.setHex(baseColor);
+                        mat.emissiveIntensity = baseIntensity;
                     }
                 }
             });
         }
 
-        // Add initial domino
-        const initialDomino = createDomino(0);
+        // Add initial sphere instead of domino
+        const initialDomino = createDomino(0, 0xffffff);
         initialDomino.depth = 1;
-        dominoes.push(initialDomino);
+        // initialDomino is already pushed to dominoes and added to scene inside createDomino -> createDominoAt
 
         activeDomino = initialDomino;
         selectedDominoes.add(initialDomino);
         updateHighlights();
+        updateGlobalStats();
 
         // Initial draw of the shape
         drawDominoShape(DOMINO_WIDTH, DOMINO_HEIGHT, document.getElementById('geometry-select').value);
@@ -1970,6 +2052,7 @@
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
             logAction("Added Domino");
+            updateGlobalStats();
         }
 
         function turnLeft() {
@@ -1987,167 +2070,163 @@
                 const lastRot = last.group.rotation.y;
 
                 const lastQuat = last.group.quaternion;
+                const branchCount = parseInt(document.getElementById('branch-select').value, 10);
+                const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
 
-                // Left Turn: Center is to the Left (+X in local space)
-                // Local Left is (1, 0, 0) rotated by quaternion
-                const localLeft = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat);
-                const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                for (let b = 0; b < branchCount; b++) {
+                    const branchRot = new THREE.Quaternion().setFromAxisAngle(localForward, (b * 2 * Math.PI) / branchCount);
+                    // Local Left is (1, 0, 0) rotated by quaternion and then by branch rotation
+                    const localLeft = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
+                    const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
 
-                const center = lastPos.clone().add(localLeft.clone().multiplyScalar(radius));
+                    const center = lastPos.clone().add(localLeft.clone().multiplyScalar(radius));
+                    const startVec = lastPos.clone().sub(center);
 
-                // Vector from Center to LastPos
-                const startVec = lastPos.clone().sub(center);
+                    let currentParent = last;
+                    const isSpiral = document.getElementById('spiral-check').checked;
 
-                let currentParent = last;
-                const isSpiral = document.getElementById('spiral-check').checked;
+                    if (isSpiral) {
+                        const spiralDirection = document.getElementById('spiral-direction').value;
+                        const r0 = radius;
+                        const totalTheta = 6 * Math.PI;
+                        let currentTheta = 0;
+                        let spiralStepIndex = 0;
 
-                if (isSpiral) {
-                    const spiralDirection = document.getElementById('spiral-direction').value;
-                    const r0 = radius;
-                    const totalTheta = 6 * Math.PI;
-                    let currentTheta = 0;
-                    let spiralStepIndex = 0;
+                        // Gradation Setup
+                        let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                        const isGradation = document.getElementById('gradation-check').checked;
+                        const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                        const isUpDown = document.getElementById('updown-mode-check').checked;
+                        const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                    // Gradation Setup
-                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                    const isGradation = document.getElementById('gradation-check').checked;
-                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
-                    const isUpDown = document.getElementById('updown-mode-check').checked;
-                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+                        const targetSpacing = 1.0;
 
-                    const targetSpacing = 1.0;
+                        if (spiralDirection === '+') {
+                            const spiralCenter = lastPos.clone();
+                            const k = r0 / totalTheta;
+                            // branchForward is just localForward rotated by branchRot (which is around localForward, so it's the same, but for consistency)
+                            const branchForward = localForward.clone().applyQuaternion(branchRot);
 
-                    if (spiralDirection === '+') {
-                        // Outward Spiral: Center is lastPos, starts from θ=0, r=0
-                        const center = lastPos.clone();
-                        const k = r0 / totalTheta;
-                        const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
+                            currentTheta = (k > 0) ? targetSpacing / k : 0.1;
 
-                        // Start from θ that gives r ~ targetSpacing
-                        currentTheta = (k > 0) ? targetSpacing / k : 0.1;
+                            while (currentTheta < totalTheta) {
+                                const currentR = k * currentTheta;
+                                const dSToDTheta = k * Math.sqrt(currentTheta * currentTheta + 1);
+                                const dTheta = targetSpacing / dSToDTheta;
 
-                        while (currentTheta < totalTheta) {
-                            const currentR = k * currentTheta;
+                                const nextVec = branchForward.clone().applyAxisAngle(localUp, currentTheta).multiplyScalar(currentR);
+                                let nextPos = spiralCenter.clone().add(nextVec);
 
-                            // Approximate dS = k * sqrt(theta^2 + 1) * dTheta
-                            const dSToDTheta = k * Math.sqrt(currentTheta * currentTheta + 1);
-                            const dTheta = targetSpacing / dSToDTheta;
+                                if (isUpDown) {
+                                    nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                }
 
-                            const nextVec = localForward.clone().applyAxisAngle(localUp, currentTheta).multiplyScalar(currentR);
-                            let nextPos = center.clone().add(nextVec);
+                                const rotAngle = currentTheta + Math.atan(currentTheta);
+                                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
+                                // Orientation: rotQuat * branchRot * lastQuat
+                                const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
 
-                            if (isUpDown) {
-                                nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                currentIndex++;
+                                const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                                newDomino.gradationIndex = currentIndex;
+                                newDomino.depth = currentParent.depth + 1;
+
+                                dominoes.push(newDomino);
+                                createdDominoes.push(newDomino);
+
+                                currentParent.children.push(newDomino);
+                                currentParent = newDomino;
+                                spiralStepIndex++;
+                                currentTheta += dTheta;
                             }
+                        } else {
+                            while (currentTheta < totalTheta - 0.1) {
+                                const currentR = r0 * (1 - currentTheta / totalTheta);
+                                if (currentR < 0.2) break;
 
-                            // Correct Tangent Direction
-                            const rotAngle = currentTheta + Math.atan(currentTheta);
-                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
-                            const newQuat = rotQuat.clone().multiply(lastQuat);
+                                const drDTheta = -r0 / totalTheta;
+                                const dSToDTheta = Math.sqrt(drDTheta * drDTheta + currentR * currentR);
+                                const dTheta = targetSpacing / dSToDTheta;
 
-                            currentIndex++;
-                            const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                            const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
-                            newDomino.gradationIndex = currentIndex;
-                            newDomino.depth = currentParent.depth + 1;
+                                currentTheta += dTheta;
+                                if (currentTheta > totalTheta) break;
 
-                            dominoes.push(newDomino);
-                            createdDominoes.push(newDomino);
+                                const nextR = r0 * (1 - currentTheta / totalTheta);
 
-                            currentParent.children.push(newDomino);
-                            currentParent = newDomino;
-                            spiralStepIndex++;
+                                const nextVec = startVec.clone().setLength(nextR).applyAxisAngle(localUp, currentTheta);
+                                let nextPos = center.clone().add(nextVec);
 
-                            currentTheta += dTheta;
+                                if (isUpDown) {
+                                    nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                }
+
+                                const rotAngle = currentTheta + Math.atan((r0 / totalTheta) / nextR);
+                                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
+                                const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+
+                                currentIndex++;
+                                const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                                newDomino.gradationIndex = currentIndex;
+                                newDomino.depth = currentParent.depth + 1;
+
+                                dominoes.push(newDomino);
+                                createdDominoes.push(newDomino);
+
+                                currentParent.children.push(newDomino);
+                                currentParent = newDomino;
+                                spiralStepIndex++;
+                            }
                         }
                     } else {
-                        // Inward Spiral: Center is at distance radius, spirals to center
-                        while (currentTheta < totalTheta - 0.1) {
-                            const currentR = r0 * (1 - currentTheta / totalTheta);
-                            if (currentR < 0.2) break; // Too close to center
+                        const angles = [];
+                        for (let n = 1; n <= radius + 1; n++) {
+                            angles.push(n * 90 / (radius + 1));
+                        }
 
-                            // Approximate dS = sqrt( (dr/dTheta)^2 + r^2 ) * dTheta
-                            const drDTheta = -r0 / totalTheta;
-                            const dSToDTheta = Math.sqrt(drDTheta * drDTheta + currentR * currentR);
-                            const dTheta = targetSpacing / dSToDTheta;
 
-                            currentTheta += dTheta;
-                            if (currentTheta > totalTheta) break;
 
-                            const nextR = r0 * (1 - currentTheta / totalTheta);
+                        // Gradation Setup
+                        let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                        const isGradation = document.getElementById('gradation-check').checked;
+                        const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
 
-                            const nextVec = startVec.clone().setLength(nextR).applyAxisAngle(localUp, currentTheta);
-                            let nextPos = center.clone().add(nextVec);
+                        const isUpDown = document.getElementById('updown-mode-check').checked;
+                        const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+
+                        angles.forEach((deg, index) => {
+                            const rad = deg * (Math.PI / 180);
+
+                            // Rotate startVec by 'rad' around Local Up axis (CCW)
+                            const newVec = startVec.clone().applyAxisAngle(localUp, rad);
+                            let newPos = center.clone().add(newVec);
 
                             if (isUpDown) {
-                                nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                // Apply offset based on step index (index + 1 because we skip degree 0)
+                                newPos.add(localUp.clone().multiplyScalar(yOffset * (index + 1)));
                             }
 
-                            const rotAngle = currentTheta + Math.atan((r0 / totalTheta) / nextR);
-                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
-                            const newQuat = rotQuat.clone().multiply(lastQuat);
+                            // New Rotation: Rotate original quaternion around local up
+                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rad);
+                            const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
 
                             currentIndex++;
                             const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                            const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                            const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
                             newDomino.gradationIndex = currentIndex;
                             newDomino.depth = currentParent.depth + 1;
 
                             dominoes.push(newDomino);
-                            createdDominoes.push(newDomino);
+                            createdDominoes.push(newDomino); // Add to created list
 
+                            // Connect graph
                             currentParent.children.push(newDomino);
                             currentParent = newDomino;
-                            spiralStepIndex++;
-                        }
+                        });
                     }
-                } else {
-                    const angles = [];
-                    for (let n = 1; n <= radius + 1; n++) {
-                        angles.push(n * 90 / (radius + 1));
-                    }
-
-
-
-                    // Gradation Setup
-                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                    const isGradation = document.getElementById('gradation-check').checked;
-                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
-
-                    const isUpDown = document.getElementById('updown-mode-check').checked;
-                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
-
-                    angles.forEach((deg, index) => {
-                        const rad = deg * (Math.PI / 180);
-
-                        // Rotate startVec by 'rad' around Local Up axis (CCW)
-                        const newVec = startVec.clone().applyAxisAngle(localUp, rad);
-                        let newPos = center.clone().add(newVec);
-
-                        if (isUpDown) {
-                            // Apply offset based on step index (index + 1 because we skip degree 0)
-                            newPos.add(localUp.clone().multiplyScalar(yOffset * (index + 1)));
-                        }
-
-                        // New Rotation: Rotate original quaternion around local up
-                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rad);
-                        const newQuat = rotQuat.clone().multiply(lastQuat);
-
-                        currentIndex++;
-                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
-                        newDomino.gradationIndex = currentIndex;
-                        newDomino.depth = currentParent.depth + 1;
-
-                        dominoes.push(newDomino);
-                        createdDominoes.push(newDomino); // Add to created list
-
-                        // Connect graph
-                        currentParent.children.push(newDomino);
-                        currentParent = newDomino;
-                    });
+                    newSelection.add(currentParent);
                 }
-                newSelection.add(currentParent);
             });
 
             selectedDominoes.clear();
@@ -2161,7 +2240,9 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction(`Turned Left (Radius: ${radius})`);
+            const branchCountVal = parseInt(document.getElementById('branch-select').value, 10);
+            logAction(`Turned Left (Radius: ${radius}${branchCountVal > 1 ? ', Branch: ' + branchCountVal : ''})`);
+            updateGlobalStats();
         }
 
         function turnRight() {
@@ -2179,169 +2260,151 @@
                 const lastRot = last.group.rotation.y;
 
                 const lastQuat = last.group.quaternion;
+                const branchCount = parseInt(document.getElementById('branch-select').value, 10);
+                const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
 
-                // Right Turn: Center is to the Right (-X in local space)
-                // Local Right is (-1, 0, 0) rotated by quaternion
-                const localRight = new THREE.Vector3(-1, 0, 0).applyQuaternion(lastQuat);
-                const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                for (let b = 0; b < branchCount; b++) {
+                    const branchRot = new THREE.Quaternion().setFromAxisAngle(localForward, (b * 2 * Math.PI) / branchCount);
+                    // Local Right is (-1, 0, 0) rotated by quaternion and branchRot
+                    const localRight = new THREE.Vector3(-1, 0, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
+                    const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
 
-                const center = lastPos.clone().add(localRight.clone().multiplyScalar(radius));
+                    const center = lastPos.clone().add(localRight.clone().multiplyScalar(radius));
+                    const startVec = lastPos.clone().sub(center);
 
-                // Vector from Center to LastPos
-                const startVec = lastPos.clone().sub(center);
+                    let currentParent = last;
+                    const isSpiral = document.getElementById('spiral-check').checked;
 
-                let currentParent = last;
-                const isSpiral = document.getElementById('spiral-check').checked;
+                    if (isSpiral) {
+                        const spiralDirection = document.getElementById('spiral-direction').value;
+                        const r0 = radius;
+                        const totalTheta = 6 * Math.PI;
+                        let currentTheta = 0;
+                        let spiralStepIndex = 0;
 
-                if (isSpiral) {
-                    const spiralDirection = document.getElementById('spiral-direction').value;
-                    const r0 = radius;
-                    const totalTheta = 6 * Math.PI;
-                    let currentTheta = 0;
-                    let spiralStepIndex = 0;
+                        let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                        const isGradation = document.getElementById('gradation-check').checked;
+                        const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                        const isUpDown = document.getElementById('updown-mode-check').checked;
+                        const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                    // Gradation Setup
-                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                    const isGradation = document.getElementById('gradation-check').checked;
-                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
-                    const isUpDown = document.getElementById('updown-mode-check').checked;
-                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+                        const targetSpacing = 1.0;
 
-                    const targetSpacing = 1.0;
+                        if (spiralDirection === '+') {
+                            const spiralCenter = lastPos.clone();
+                            const k = r0 / totalTheta;
+                            const branchForward = localForward.clone().applyQuaternion(branchRot);
 
-                    if (spiralDirection === '+') {
-                        // Outward Spiral: Center is lastPos, starts from θ=0, r=0
-                        const center = lastPos.clone();
-                        const k = r0 / totalTheta;
-                        const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
+                            currentTheta = (k > 0) ? targetSpacing / k : 0.1;
 
-                        // Start from θ that gives r ~ targetSpacing
-                        currentTheta = (k > 0) ? targetSpacing / k : 0.1;
+                            while (currentTheta < totalTheta) {
+                                const currentR = k * currentTheta;
+                                const dSToDTheta = k * Math.sqrt(currentTheta * currentTheta + 1);
+                                const dTheta = targetSpacing / dSToDTheta;
 
-                        while (currentTheta < totalTheta) {
-                            const currentR = k * currentTheta;
+                                // CW rotation uses -currentTheta
+                                const nextVec = branchForward.clone().applyAxisAngle(localUp, -currentTheta).multiplyScalar(currentR);
+                                let nextPos = spiralCenter.clone().add(nextVec);
 
-                            // Approximate dS = k * sqrt(theta^2 + 1) * dTheta
-                            const dSToDTheta = k * Math.sqrt(currentTheta * currentTheta + 1);
-                            const dTheta = targetSpacing / dSToDTheta;
+                                if (isUpDown) {
+                                    nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                }
 
-                            // CW rotation uses -currentTheta
-                            const nextVec = localForward.clone().applyAxisAngle(localUp, -currentTheta).multiplyScalar(currentR);
-                            let nextPos = center.clone().add(nextVec);
+                                const rotAngle = -(currentTheta + Math.atan(currentTheta));
+                                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
+                                const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
 
-                            if (isUpDown) {
-                                nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                currentIndex++;
+                                const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                                newDomino.gradationIndex = currentIndex;
+                                newDomino.depth = currentParent.depth + 1;
+
+                                dominoes.push(newDomino);
+                                createdDominoes.push(newDomino);
+
+                                currentParent.children.push(newDomino);
+                                currentParent = newDomino;
+                                spiralStepIndex++;
+                                currentTheta += dTheta;
                             }
+                        } else {
+                            while (currentTheta < totalTheta - 0.1) {
+                                const currentR = r0 * (1 - currentTheta / totalTheta);
+                                if (currentR < 0.2) break;
 
-                            // Correct Tangent Direction
-                            const rotAngle = -(currentTheta + Math.atan(currentTheta));
-                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
-                            const newQuat = rotQuat.clone().multiply(lastQuat);
+                                const drDTheta = -r0 / totalTheta;
+                                const dSToDTheta = Math.sqrt(drDTheta * drDTheta + currentR * currentR);
+                                const dTheta = targetSpacing / dSToDTheta;
 
-                            currentIndex++;
-                            const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                            const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
-                            newDomino.gradationIndex = currentIndex;
-                            newDomino.depth = currentParent.depth + 1;
+                                currentTheta += dTheta;
+                                if (currentTheta > totalTheta) break;
 
-                            dominoes.push(newDomino);
-                            createdDominoes.push(newDomino);
+                                const nextR = r0 * (1 - currentTheta / totalTheta);
+                                const nextVec = startVec.clone().setLength(nextR).applyAxisAngle(localUp, -currentTheta);
+                                let nextPos = center.clone().add(nextVec);
 
-                            currentParent.children.push(newDomino);
-                            currentParent = newDomino;
-                            spiralStepIndex++;
+                                if (isUpDown) {
+                                    nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                }
 
-                            currentTheta += dTheta;
+                                const rotAngle = -(currentTheta + Math.atan((r0 / totalTheta) / nextR));
+                                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
+                                const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+
+                                currentIndex++;
+                                const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                                newDomino.gradationIndex = currentIndex;
+                                newDomino.depth = currentParent.depth + 1;
+
+                                dominoes.push(newDomino);
+                                createdDominoes.push(newDomino);
+
+                                currentParent.children.push(newDomino);
+                                currentParent = newDomino;
+                                spiralStepIndex++;
+                            }
                         }
                     } else {
-                        // Inward Spiral: Center is at distance radius, spirals to center (CW)
-                        while (currentTheta < totalTheta - 0.1) {
-                            const currentR = r0 * (1 - currentTheta / totalTheta);
-                            if (currentR < 0.2) break;
+                        const angles = [];
+                        for (let n = 1; n <= radius + 1; n++) {
+                            angles.push(n * 90 / (radius + 1));
+                        }
 
-                            const drDTheta = -r0 / totalTheta;
-                            const dSToDTheta = Math.sqrt(drDTheta * drDTheta + currentR * currentR);
-                            const dTheta = targetSpacing / dSToDTheta;
+                        let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                        const isGradation = document.getElementById('gradation-check').checked;
+                        const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                        const isUpDown = document.getElementById('updown-mode-check').checked;
+                        const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                            currentTheta += dTheta;
-                            if (currentTheta > totalTheta) break;
+                        angles.forEach((deg, index) => {
+                            const rad = deg * (Math.PI / 180);
 
-                            const nextR = r0 * (1 - currentTheta / totalTheta);
-
-                            // CW rotation uses -currentTheta
-                            const nextVec = startVec.clone().setLength(nextR).applyAxisAngle(localUp, -currentTheta);
-                            let nextPos = center.clone().add(nextVec);
+                            const newVec = startVec.clone().applyAxisAngle(localUp, -rad);
+                            let newPos = center.clone().add(newVec);
 
                             if (isUpDown) {
-                                nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                newPos.add(localUp.clone().multiplyScalar(yOffset * (index + 1)));
                             }
 
-                            // Correct Tangent Direction
-                            const rotAngle = -(currentTheta + Math.atan((r0 / totalTheta) / nextR));
-                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
-                            const newQuat = rotQuat.clone().multiply(lastQuat);
+                            const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, -rad);
+                            const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
 
                             currentIndex++;
                             const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                            const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                            const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
                             newDomino.gradationIndex = currentIndex;
                             newDomino.depth = currentParent.depth + 1;
 
                             dominoes.push(newDomino);
                             createdDominoes.push(newDomino);
-
                             currentParent.children.push(newDomino);
                             currentParent = newDomino;
-                            spiralStepIndex++;
-                        }
+                        });
                     }
-                } else {
-                    const angles = [];
-                    for (let n = 1; n <= radius + 1; n++) {
-                        angles.push(n * 90 / (radius + 1));
-                    }
-
-
-
-                    // Gradation Setup
-                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                    const isGradation = document.getElementById('gradation-check').checked;
-                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
-
-                    const isUpDown = document.getElementById('updown-mode-check').checked;
-                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
-
-                    angles.forEach((deg, index) => {
-                        const rad = deg * (Math.PI / 180);
-
-                        // Rotate startVec by '-rad' (CW) around Local Up
-                        const newVec = startVec.clone().applyAxisAngle(localUp, -rad);
-                        let newPos = center.clone().add(newVec);
-
-                        if (isUpDown) {
-                            // Apply offset based on step index
-                            newPos.add(localUp.clone().multiplyScalar(yOffset * (index + 1)));
-                        }
-
-                        // New Rotation: Rotate original quaternion around local up by -rad
-                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, -rad);
-                        const newQuat = rotQuat.clone().multiply(lastQuat);
-
-                        currentIndex++;
-                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
-                        newDomino.gradationIndex = currentIndex;
-                        newDomino.depth = currentParent.depth + 1;
-
-                        dominoes.push(newDomino);
-                        createdDominoes.push(newDomino); // Add to created list
-
-                        // Connect graph
-                        currentParent.children.push(newDomino);
-                        currentParent = newDomino;
-                    });
+                    newSelection.add(currentParent);
                 }
-                newSelection.add(currentParent);
             });
 
             selectedDominoes.clear();
@@ -2355,7 +2418,9 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction(`Turned Right (Radius: ${radius})`);
+            const branchCountVal = parseInt(document.getElementById('branch-select').value, 10);
+            logAction(`Turned Right (Radius: ${radius}${branchCountVal > 1 ? ', Branch: ' + branchCountVal : ''})`);
+            updateGlobalStats();
         }
 
 
@@ -2376,7 +2441,9 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            const delta = clock.getDelta();
+            let delta = clock.getDelta();
+            // Cap delta to prevent excessive skips during lag
+            if (delta > 0.1) delta = 0.1;
             // Ensure targetRotation is available. If not defined globally, define it.
             // Since I cannot conditionally define a const in strict mode easily without scope issues,
             // I will assume it is defined as per previous code usage. 
@@ -2391,146 +2458,73 @@
             // const targetRotation = Math.PI / 2.2; // ~80 degrees
 
             dominoes.forEach((domino, index) => {
-                if (domino.isFalling && !domino.fallen) {
-                    // Initialize animation state if not present
-                    if (domino.animState === undefined) {
+                const mesh = domino.group.children[0];
 
-                        // Exhibition Mode: Revert material before falling
-                        if (isExhibitionMode && domino.userData && domino.userData.originalMaterial) {
-                            domino.group.children[0].material = domino.userData.originalMaterial;
-                            // Keep userData.originalMaterial in case we need to re-apply glass on reset? 
-                            // Actually reset clears isExhibitionMode, so we fully restore.
-                        }
+                if (domino.isSparking && !domino.exploded) {
+                    // Initialize spark state if not present
+                    if (domino.sparkTime === 0) {
+                        mesh.visible = true;
+                        mesh.scale.set(0.01, 0.01, 0.01);
 
-                        let fallDir = 1;
-
-                        // Priority 1: Momentum (Inherited from parent trigger)
-                        if (domino.suggestedFallDirection !== undefined) {
-                            fallDir = domino.suggestedFallDirection;
-                        }
-
-                        domino.animState = {
-                            initialPos: domino.group.position.clone(),
-                            initialQuat: domino.group.quaternion.clone(), // Store initial Quaternion
-                            currentFallAngle: 0,
-                            fallDirection: fallDir
-                        };
+                        // Play sound on appearance/spark
+                        const hue = mesh.userData.hue;
+                        playClickSound(hue);
                     }
 
-                    // We check if we CAN move forward
-                    // 1. Calculate intended speed
-                    // Use currentFallAngle (relative fall progress) for speed curve
-                    let currentSpeed = 0;
-                    // Use absolute angle for speed profile
-                    const rot = Math.abs(domino.animState.currentFallAngle);
+                    domino.sparkTime += delta * 2.5; // Controls speed of explosion animation
 
-                    if (rot < angle30) {
-                        currentSpeed = animationSpeed;
-                    } else if (rot < angle45) {
-                        const angleDiff = rot - angle30;
-                        currentSpeed = animationSpeed * (angleDiff * 8);
-                    } else if (rot < angle60) {
-                        const angleDiff = rot - angle45;
-                        currentSpeed = animationSpeed * (angleDiff * 8);
-                    } else if (rot < angle75) {
-                        const angleDiff = rot - angle45;
-                        currentSpeed = animationSpeed * (angleDiff * 8);
+                    const t = domino.sparkTime;
+
+                    if (t < 0.2) {
+                        // Explosion phase 1: Rapid scale up
+                        const s = (t / 0.2) * 5.0; // Scale up to 5x
+                        mesh.scale.set(s, s, s);
+
+                        // Brighten emissive
+                        if (mesh.material.emissive) {
+                            mesh.material.emissive.setHex(0xffffff);
+                            mesh.material.emissiveIntensity = 2.0;
+                        }
+                    } else if (t < 0.5) {
+                        // Explosion phase 2: Settle to 1.0
+                        const factor = (t - 0.2) / 0.3;
+                        const s = 5.0 - factor * 4.0; // 5.0 down to 1.0
+                        mesh.scale.set(s, s, s);
+
+                        // Restore original emissive
+                        if (mesh.material.emissive) {
+                            const baseCol = mesh.userData.baseEmissive || 0x000000;
+                            const targetCol = new THREE.Color(baseCol);
+                            mesh.material.emissive.lerp(targetCol, factor);
+                            mesh.material.emissiveIntensity = 2.0 - factor * 1.0;
+                        }
                     } else {
-                        const angleDiff = rot - angle75;
-                        currentSpeed = animationSpeed * (angleDiff * 8);
+                        // Done sparking
+                        mesh.scale.set(1, 1, 1);
+                        if (mesh.material.emissive) {
+                            const baseCol = mesh.userData.baseEmissive || 0x000000;
+                            mesh.material.emissive.setHex(baseCol);
+                            mesh.material.emissiveIntensity = 1.0;
+                        }
+                        domino.exploded = true;
                     }
 
-                    // Ensure minimum speed to prevent getting stuck if speed calculation yields 0
-                    if (currentSpeed < 0.5) currentSpeed = 0.5;
-
-                    // 2. Check for collisions with children
-                    // We update the matrix world to ensure current positions are valid for collision check
-                    domino.group.updateMatrixWorld(true);
-
-                    // Create OBB for current domino
-                    // The mesh is the first child.
-                    const mesh1 = domino.group.children[0];
-                    if (!mesh1.geometry.boundingBox) mesh1.geometry.computeBoundingBox();
-                    const aabb1 = mesh1.geometry.boundingBox;
-                    const obb1 = new OBB().fromBox3(aabb1);
-                    // OBB needs to be transformed by the mesh's world matrix
-                    obb1.applyMatrix4(mesh1.matrixWorld);
-
-                    let isBlocked = false;
-
-                    if (domino.children.length > 0) {
+                    // Trigger children when explosion is well underway
+                    if (t > 0.1 && domino.children.length > 0) {
                         domino.children.forEach(child => {
-                            // Only check collision if child is close enough? 
-                            // Box3/OBB check is fast enough.
-                            child.group.updateMatrixWorld(true);
-
-                            const mesh2 = child.group.children[0];
-                            if (!mesh2.geometry.boundingBox) mesh2.geometry.computeBoundingBox();
-                            const aabb2 = mesh2.geometry.boundingBox;
-                            const obb2 = new OBB().fromBox3(aabb2);
-                            obb2.applyMatrix4(mesh2.matrixWorld);
-
-                            if (obb1.intersectsOBB(obb2)) {
-                                if (!child.isFalling) {
-                                    isBlocked = true;
-                                    child.isFalling = true;
-                                    // Pass momentum/direction to child
-                                    if (domino.animState) {
-                                        child.suggestedFallDirection = domino.animState.fallDirection;
-                                    }
-                                    const hue = child.group.children[0].userData.hue;
-                                    playClickSound(hue);
-                                } else if (child.isBlocked) {
-                                    isBlocked = true;
-                                }
+                            if (!child.isSparking && !child.nextGenSparking) {
+                                child.nextGenSparking = true;
                             }
                         });
                     }
+                }
+            });
 
-                    // 3. Update state
-                    domino.isBlocked = isBlocked;
-                    if (!isBlocked) {
-                        // Resume/Continue falling
-                        // Apply direction
-                        domino.animState.currentFallAngle += currentSpeed * delta * domino.animState.fallDirection;
-
-                        // Apply Rotation: Use Quaternion to rotate around LOCAL X axis
-                        const qRot = new THREE.Quaternion();
-                        qRot.setFromAxisAngle(new THREE.Vector3(1, 0, 0), domino.animState.currentFallAngle);
-                        domino.group.quaternion.copy(domino.animState.initialQuat).multiply(qRot);
-
-                        // Check if fallen (relative to target rotation range)
-                        // Direction dependent check
-                        let isFallen = false;
-                        if (domino.animState.fallDirection > 0) {
-                            if (domino.animState.currentFallAngle > targetRotation) {
-                                domino.animState.currentFallAngle = targetRotation;
-                                isFallen = true;
-                            }
-                        } else {
-                            if (domino.animState.currentFallAngle < -targetRotation) {
-                                domino.animState.currentFallAngle = -targetRotation;
-                                isFallen = true;
-                            }
-                        }
-
-                        if (isFallen) {
-                            // Force final rotation state
-                            const qRot = new THREE.Quaternion();
-                            qRot.setFromAxisAngle(new THREE.Vector3(1, 0, 0), domino.animState.currentFallAngle);
-                            domino.group.quaternion.copy(domino.animState.initialQuat).multiply(qRot);
-
-                            domino.fallen = true;
-
-                            // Final lift adjustment
-                            const finalLift = (DOMINO_DEPTH / 2) * Math.sin(targetRotation);
-                            domino.group.position.y = domino.animState.initialPos.y + finalLift;
-                        }
-                    } else {
-                        // Blocked: Velocity effectively 0. 
-                        // We do NOT increment rotation.
-                        // We do NOT set isFalling = false, so it stays "active" but "paused".
-                    }
+            // Transition next generation to active sparking
+            dominoes.forEach(domino => {
+                if (domino.nextGenSparking) {
+                    domino.isSparking = true;
+                    domino.nextGenSparking = false;
                 }
             });
 
@@ -2542,6 +2536,7 @@
             targetCrosshair.position.copy(controls.target);
 
             const coordDisplay = document.getElementById('coord-display');
+
             if (coordDisplay) {
                 let text = `Camera: X: ${camera.position.x.toFixed(2)} Y: ${camera.position.y.toFixed(2)} Z: ${camera.position.z.toFixed(2)}<br>Target: X: ${controls.target.x.toFixed(2)} Y: ${controls.target.y.toFixed(2)} Z: ${controls.target.z.toFixed(2)}`;
                 if (activeDomino) {
@@ -2560,26 +2555,62 @@
                 audioCtx.resume();
             }
 
-            if (dominoes.length > 0 && !dominoes[0].isFalling) {
-                dominoes[0].isFalling = true;
-                logAction("Animation Started");
+            // Check if any sphere is currently sparking or exploded to decide between Start and Reset
+            const isAnyActive = dominoes.some(d => d.isSparking || d.exploded);
+
+            if (dominoes.length > 0 && !isAnyActive) {
+                // HIDE ALL SPHERES FIRST for the sequential appear effect
+                dominoes.forEach(d => {
+                    const mesh = d.group.children[0];
+                    mesh.visible = false;
+                    mesh.scale.set(0, 0, 0);
+                    d.isSparking = false;
+                    d.exploded = false;
+                    d.sparkTime = 0;
+                });
+
+                // Find all root spheres (those not listed as children of any other sphere)
+                const allChildren = new Set();
+                dominoes.forEach(d => {
+                    if (d.children) {
+                        d.children.forEach(c => allChildren.add(c));
+                    }
+                });
+
+                let triggeredCount = 0;
+                dominoes.forEach(d => {
+                    if (!allChildren.has(d)) {
+                        d.isSparking = true;
+                        triggeredCount++;
+                    }
+                });
+
+                logAction(`Sparking Started (${triggeredCount} chains)`);
             } else {
                 // Reset all
-                // Reset all
                 dominoes.forEach(d => {
+                    d.isSparking = false;
+                    d.sparkTime = 0;
+                    d.exploded = false;
+                    const mesh = d.group.children[0];
+                    mesh.visible = false;
+                    mesh.scale.set(0, 0, 0);
+
+                    // Restore original emissive
+                    if (mesh.material && mesh.material.emissive) {
+                        const baseCol = mesh.userData.baseEmissive || 0x000000;
+                        mesh.material.emissive.setHex(baseCol);
+                        mesh.material.emissiveIntensity = 1.0;
+                    }
+
+                    // Reset transformation if it was falling
                     if (d.animState) {
                         d.group.quaternion.copy(d.animState.initialQuat);
                         d.group.position.copy(d.animState.initialPos);
-                        d.animState.currentFallAngle = 0;
-                        d.animState = undefined; // Force re-initialization on next run
+                        d.animState = undefined;
                     }
                     d.isFalling = false;
                     d.fallen = false;
-                    d.fallen = false;
-                    d.triggeredNext = false;
-                    d.isBlocked = false;
-                    d.suggestedFallDirection = undefined;
-                    d.suggestedFallDirection = undefined;
                 });
 
                 // Exhibition Mode Reset
@@ -2618,16 +2649,10 @@
             if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     const mesh = domino.group.children[0];
-                    if (Array.isArray(mesh.material)) {
-                        const bodyMat = mesh.material[0];
-                        bodyMat.color.set(colorVal);
-                        // Note: Do not update baseEmissive here, as the current emissive might be the highlight color.
-                    }
+                    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+                    mat.color.set(colorVal);
                 });
                 updateHighlights();
-            } else if (selectedType === 'ground') {
-                ground.material.color.set(colorVal);
-                logAction(`Ground Color Changed: ${colorVal}`);
             } else if (selectedType === 'background') {
                 scene.background.set(colorVal);
                 logAction(`Background Color Changed: ${colorVal}`);
@@ -2822,59 +2847,62 @@
                 const last = activeDomino;
                 const lastPos = last.group.position;
                 const lastQuat = last.group.quaternion;
+                const branchCount = parseInt(document.getElementById('branch-select').value, 10);
+                const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
 
-                // Go Up: Vertical Circle
-                // Axis of rotation is the "Right" vector of the domino
-                // Local Right is (1, 0, 0) rotated by quaternion
-                const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat);
-                const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                for (let b = 0; b < branchCount; b++) {
+                    const branchRot = new THREE.Quaternion().setFromAxisAngle(localForward, (b * 2 * Math.PI) / branchCount);
+                    // Local Right is (1, 0, 0) rotated by quaternion and then by branch rotation
+                    const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
+                    const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
 
-                const center = lastPos.clone().add(localUp.clone().multiplyScalar(radius));
-                const startVec = lastPos.clone().sub(center);
+                    const center = lastPos.clone().add(localUp.clone().multiplyScalar(radius));
+                    const startVec = lastPos.clone().sub(center);
 
-                const steps = radius + 1;
-                const totalAngle = Math.PI / 2;
+                    const steps = radius + 1;
+                    const totalAngle = Math.PI / 2;
 
-                let currentParent = last;
+                    let currentParent = last;
 
-                // Gradation Setup
-                let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                const isGradation = document.getElementById('gradation-check').checked;
-                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                    // Gradation Setup
+                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                    const isGradation = document.getElementById('gradation-check').checked;
+                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
 
-                const isUpDown = document.getElementById('updown-mode-check').checked;
-                const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+                    const isUpDown = document.getElementById('updown-mode-check').checked;
+                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                // We start from step 1
-                for (let n = 1; n <= steps; n++) {
-                    const ratio = n / steps;
-                    const theta = ratio * totalAngle;
+                    // We start from step 1
+                    for (let n = 1; n <= steps; n++) {
+                        const ratio = n / steps;
+                        const theta = ratio * totalAngle;
 
-                    // Rotate startVec around localRight axis by -theta (Negative for Backward loop/Original behavior)
-                    const newVec = startVec.clone().applyAxisAngle(localRight, -theta);
-                    let newPos = center.clone().add(newVec);
+                        // Rotate startVec around localRight axis by -theta (Negative for Backward loop/Original behavior)
+                        const newVec = startVec.clone().applyAxisAngle(localRight, -theta);
+                        let newPos = center.clone().add(newVec);
 
-                    if (isUpDown) {
-                        // Apply vertical offset in local space
-                        newPos.add(localUp.clone().multiplyScalar(yOffset * n));
+                        if (isUpDown) {
+                            // Apply vertical offset in local space
+                            newPos.add(localUp.clone().multiplyScalar(yOffset * n));
+                        }
+
+                        // New Rotation: Rotate original quaternion around local right, then incorporate branch rotation
+                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, -theta);
+                        const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+
+                        currentIndex++;
+                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                        newDomino.gradationIndex = currentIndex;
+                        newDomino.depth = currentParent.depth + 1;
+
+                        dominoes.push(newDomino);
+                        createdDominoes.push(newDomino);
+                        currentParent.children.push(newDomino);
+                        currentParent = newDomino;
                     }
-
-                    // Rotate quaternion around localRight by -theta (Pitch Up)
-                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, -theta);
-                    const newQuat = rotQuat.clone().multiply(lastQuat);
-
-                    currentIndex++;
-                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                    const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
-                    newDomino.gradationIndex = currentIndex;
-                    newDomino.depth = currentParent.depth + 1;
-
-                    dominoes.push(newDomino);
-                    createdDominoes.push(newDomino);
-                    currentParent.children.push(newDomino);
-                    currentParent = newDomino;
+                    newSelection.add(currentParent);
                 }
-                newSelection.add(currentParent);
             });
 
             selectedDominoes.clear();
@@ -2888,7 +2916,9 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction(`Go Up(Radius: ${radius})`);
+            const branchCountVal = parseInt(document.getElementById('branch-select').value, 10);
+            logAction(`Go Up (Radius: ${radius}${branchCountVal > 1 ? ', Branch: ' + branchCountVal : ''})`);
+            updateGlobalStats();
         }
 
         function goDown() {
@@ -2904,59 +2934,63 @@
                 const last = activeDomino;
                 const lastPos = last.group.position;
                 const lastQuat = last.group.quaternion;
+                const branchCount = parseInt(document.getElementById('branch-select').value, 10);
+                const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
 
-                // Go Down: Vertical Circle (Downwards)
-                // Axis of rotation is the "Right" vector of the domino
-                const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat);
-                const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                for (let b = 0; b < branchCount; b++) {
+                    const branchRot = new THREE.Quaternion().setFromAxisAngle(localForward, (b * 2 * Math.PI) / branchCount);
+                    // Local Right is (1, 0, 0) rotated by quaternion and branch rotation
+                    const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
+                    const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
 
-                // Center is "Below" the current domino (relative to its Up)
-                const center = lastPos.clone().sub(localUp.clone().multiplyScalar(radius));
-                const startVec = lastPos.clone().sub(center);
+                    // Center is "Below" the current domino (relative to its local Up)
+                    const center = lastPos.clone().sub(localUp.clone().multiplyScalar(radius));
+                    const startVec = lastPos.clone().sub(center);
 
-                const steps = radius + 1;
-                const totalAngle = Math.PI / 2;
+                    const steps = radius + 1;
+                    const totalAngle = Math.PI / 2;
 
-                let currentParent = last;
+                    let currentParent = last;
 
-                // Gradation Setup
-                let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                const isGradation = document.getElementById('gradation-check').checked;
-                const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                    // Gradation Setup
+                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+                    const isGradation = document.getElementById('gradation-check').checked;
+                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
 
-                const isUpDown = document.getElementById('updown-mode-check').checked;
-                const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+                    const isUpDown = document.getElementById('updown-mode-check').checked;
+                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                // We start from step 1
-                for (let n = 1; n <= steps; n++) {
-                    const ratio = n / steps;
-                    const theta = ratio * totalAngle;
+                    // We start from step 1
+                    for (let n = 1; n <= steps; n++) {
+                        const ratio = n / steps;
+                        const theta = ratio * totalAngle;
 
-                    // Rotate startVec around localRight axis by +theta (Positive for Downward loop)
-                    const newVec = startVec.clone().applyAxisAngle(localRight, theta);
-                    let newPos = center.clone().add(newVec);
+                        // Rotate startVec around localRight axis by +theta (Positive for Downward loop)
+                        const newVec = startVec.clone().applyAxisAngle(localRight, theta);
+                        let newPos = center.clone().add(newVec);
 
-                    if (isUpDown) {
-                        // Apply vertical offset relative to original ground level
-                        newPos.add(localUp.clone().multiplyScalar(yOffset * n));
+                        if (isUpDown) {
+                            // Apply vertical offset in local space
+                            newPos.add(localUp.clone().multiplyScalar(yOffset * n));
+                        }
+
+                        // New Rotation: Rotate original quaternion around local right, then incorporate branch rotation
+                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, theta);
+                        const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+
+                        currentIndex++;
+                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                        newDomino.gradationIndex = currentIndex;
+                        newDomino.depth = currentParent.depth + 1;
+
+                        dominoes.push(newDomino);
+                        createdDominoes.push(newDomino);
+                        currentParent.children.push(newDomino);
+                        currentParent = newDomino;
                     }
-
-                    // Rotate quaternion around localRight by +theta (Pitch Down)
-                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, theta);
-                    const newQuat = rotQuat.clone().multiply(lastQuat);
-
-                    currentIndex++;
-                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                    const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
-                    newDomino.gradationIndex = currentIndex;
-                    newDomino.depth = currentParent.depth + 1;
-
-                    dominoes.push(newDomino);
-                    createdDominoes.push(newDomino);
-                    currentParent.children.push(newDomino);
-                    currentParent = newDomino;
+                    newSelection.add(currentParent);
                 }
-                newSelection.add(currentParent);
             });
 
             selectedDominoes.clear();
@@ -2970,7 +3004,9 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction(`Go Down(Radius: ${radius})`);
+            const branchCountVal = parseInt(document.getElementById('branch-select').value, 10);
+            logAction(`Go Down (Radius: ${radius}${branchCountVal > 1 ? ', Branch: ' + branchCountVal : ''})`);
+            updateGlobalStats();
         }
 
         function splitNWay() {
@@ -3086,6 +3122,7 @@
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
             logAction(`Split ${targetN}-Way`);
+            updateGlobalStats();
         }
 
         createButton("add_box", () => {
@@ -3143,6 +3180,7 @@
                     domino.group.position.x += 2;
                 });
                 logAction("Moved X +2");
+                updateGlobalStats();
             }
             playClickSound();
         }, '#ff9a9e', '#fecfef', "Move X +2");
@@ -3153,6 +3191,7 @@
                     domino.group.position.z += 2;
                 });
                 logAction("Moved Z +2");
+                updateGlobalStats();
             }
             playClickSound();
         }, '#a1c4fd', '#c2e9fb', "Move Z +2");
@@ -3277,29 +3316,17 @@
                     selectedType = 'domino';
                     updateHighlights();
                     break;
-                } else if (object === ground) {
-                    clickedOnDomino = false;
                 }
             }
 
             if (!clickedOnDomino) {
-                // Check if we hit ground specifically
-                const groundIntersect = intersects.find(i => i.object === ground);
-                if (groundIntersect) {
+                // Background (or nothing)
+                if (event.target === renderer.domElement) {
                     selectedDominoes.clear();
                     activeDomino = null;
                     updateHighlights();
-                    selectedType = 'ground';
-                    logAction("Ground Selected");
-                } else {
-                    // Background (or nothing)
-                    if (event.target === renderer.domElement) {
-                        selectedDominoes.clear();
-                        activeDomino = null;
-                        updateHighlights();
-                        selectedType = 'background';
-                        logAction("Background Selected");
-                    }
+                    selectedType = 'background';
+                    logAction("Background Selected");
                 }
             }
         });
