@@ -222,13 +222,7 @@
             font-size: 12px !important;
         }
 
-        body.mobile-mode #shape-canvas {
-            top: auto !important;
-            bottom: calc(50vh + 10px) !important;
-            left: 10px !important;
-            width: 80px !important;
-            height: 80px !important;
-        }
+
 
         body.mobile-mode #history-log {
             width: 94% !important;
@@ -264,6 +258,60 @@
             height: 44px !important;
             font-size: 16px !important;
             grid-column: 1 / -1 !important;
+        }
+
+        /* Tree Overlay */
+        #tree-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        #tree-canvas-container {
+            width: 90%;
+            height: 80%;
+            background: rgba(30, 30, 30, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        #tree-canvas {
+            width: 100%;
+            height: 100%;
+            cursor: move;
+        }
+
+        #tree-controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .tree-btn {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .tree-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
         }
     </style>
     <!-- Import map for Three.js -->
@@ -600,8 +648,19 @@
         <div id="log-content" style="overflow-y: auto; flex: 1; min-height: 0; margin-top: 10px;"></div>
     </div>
 
-    <canvas id="shape-canvas" width="150" height="150"
-        style="position: absolute; top: 10px; left: 10px; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(0, 0, 0, 0.5); pointer-events: none; border-radius: 8px;"></canvas>
+    <!-- Tree Overlay -->
+    <div id="tree-overlay">
+        <h2 style="color: white; margin-bottom: 20px; font-weight: 300;">Sphere Hierarchy Tree</h2>
+        <div id="tree-canvas-container">
+            <canvas id="tree-canvas"></canvas>
+        </div>
+        <div id="tree-controls">
+            <button class="tree-btn" id="close-tree-btn">Close</button>
+            <button class="tree-btn" id="reset-tree-view-btn">Reset View</button>
+        </div>
+    </div>
+
+
 
     <script>
         const historyLog = document.getElementById('history-log');
@@ -1719,63 +1778,7 @@
             return nonIndexedGeo;
         }
 
-        function drawDominoShape(width, height, type) {
-            const canvas = document.getElementById('shape-canvas');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            const w = width / 2;
-            const h = height / 2;
 
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Setup scaling and translation to fit in canvas
-            const scale = 50; // 1 unit = 50 pixels
-            const offsetX = canvas.width / 2;
-            const offsetY = canvas.height / 2;
-
-            ctx.beginPath();
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            ctx.fillStyle = 'rgba(100, 149, 237, 0.5)'; // Cornflower blue with opacity
-
-            // Helper to transform coordinates
-            const tx = (x) => x * scale + offsetX;
-            const ty = (y) => -y * scale + offsetY; // Flip Y for canvas coords
-
-            if (type === 'circle') {
-                const radius = Math.min(w, h);
-                ctx.arc(tx(0), ty(0), 1.5 * radius * scale, 0, Math.PI * 2);
-            } else if (type === 'diamond') {
-                ctx.moveTo(tx(0), ty(h));
-                ctx.lineTo(tx(w), ty(0));
-                ctx.lineTo(tx(0), ty(-h));
-                ctx.lineTo(tx(-w), ty(0));
-                ctx.lineTo(tx(0), ty(h));
-            } else if (type === 'petal') {
-                const x = 0, y = 0;
-                const s = Math.min(w, h) / 2.5;
-
-                ctx.moveTo(tx(x), ty(y + 1.5 * s));
-                ctx.bezierCurveTo(tx(x + 2.5 * s), ty(y + 1.5 * s), tx(x + 2.0 * s), ty(y - 1.0 * s), tx(x), ty(y - 3.0 * s));
-                ctx.bezierCurveTo(tx(x - 2.0 * s), ty(y - 1.0 * s), tx(x - 2.5 * s), ty(y + 1.5 * s), tx(x), ty(y + 1.5 * s));
-            } else {
-                // Standard or Rounded
-                const radius = type === 'rounded' ? 0.5 : 0.1;
-                const r = radius;
-
-                ctx.moveTo(tx(-w), ty(-h));
-                ctx.lineTo(tx(w), ty(-h));
-                ctx.lineTo(tx(w), ty(h - r));
-                ctx.quadraticCurveTo(tx(w), ty(h), tx(w - r), ty(h));
-                ctx.lineTo(tx(-w + r), ty(h));
-                ctx.quadraticCurveTo(tx(-w), ty(h), tx(-w), ty(h - r));
-                ctx.lineTo(tx(-w), ty(-h));
-            }
-
-            ctx.fill();
-            ctx.stroke();
-        }
 
         function getGradationColor(index, step) {
             const c1Hex = document.getElementById('color-picker').value;
@@ -1793,11 +1796,9 @@
             return c1.lerp(c2, f).getStyle();
         }
 
-        function createDominoAt(x, z, rotationY = 0, color = null) {
+        function createDominoAt(x, z, rotationY = 0, color = null, parent = null) {
             const dominoGroup = new THREE.Group();
-            // Ensure rotation order is YXZ so that X-rotation (falling) happens relative to Y-rotation (orientation)
             dominoGroup.rotation.order = 'YXZ';
-            // Position the group at the pivot point on the ground
             dominoGroup.position.set(x, 0, z);
             dominoGroup.rotation.y = rotationY;
             scene.add(dominoGroup);
@@ -1814,7 +1815,6 @@
                 const hue = (dominoes.length * 0.05) % 1.0;
                 bodyMaterial.color.setHSL(hue, 1.0, 0.5);
             } else {
-                // Use provided color or current picker
                 const colorVal = color || document.getElementById('color-picker').value;
                 bodyMaterial = new THREE.MeshStandardMaterial({
                     color: colorVal,
@@ -1823,22 +1823,18 @@
                 });
             }
 
-            // Create sphere instead of domino
             const sphereGeo = new THREE.SphereGeometry(0.1, 32, 32);
-            const sphereMat = bodyMaterial.clone(); // Clone to animate individually
+            const sphereMat = bodyMaterial.clone();
 
             const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
-
-            sphereMesh.position.set(0, 0.1, 0); // Center at radius height
+            sphereMesh.position.set(0, 0.1, 0);
             sphereMesh.visible = true;
             sphereMesh.scale.set(1, 1, 1);
-
             sphereMesh.castShadow = true;
             sphereMesh.receiveShadow = true;
             dominoGroup.add(sphereMesh);
-            const dominoMesh = sphereMesh; // Keep naming for remaining logic
+            const dominoMesh = sphereMesh;
 
-            // Store metadata
             const dominoId = dominoIdCounter++;
             dominoMesh.userData = {
                 id: dominoId,
@@ -1856,22 +1852,21 @@
                 isFalling: false,
                 fallen: false,
                 isBlocked: false,
+                parent: parent,
                 children: [],
-                depth: 1,
+                depth: parent ? parent.depth + 1 : 1,
                 isSparking: false,
                 sparkTime: 0,
                 exploded: false
             };
 
-            // Link mesh back to object for raycasting
             dominoMesh.userData.domino = dominoObject;
-
             return dominoObject;
         }
 
 
 
-        function createFullyOrientedDomino(position, quaternion, color = null) {
+        function createFullyOrientedDomino(position, quaternion, color = null, parent = null) {
             const dominoGroup = new THREE.Group();
             dominoGroup.rotation.order = 'YXZ';
             dominoGroup.position.copy(position);
@@ -1927,8 +1922,9 @@
                 isFalling: false,
                 fallen: false,
                 isBlocked: false,
+                parent: parent,
                 children: [],
-                depth: 1,
+                depth: parent ? parent.depth + 1 : 1,
                 isSparking: false,
                 sparkTime: 0,
                 exploded: false
@@ -1969,7 +1965,10 @@
         // Add initial sphere instead of domino
         const initialDomino = createDomino(0, 0xffffff);
         initialDomino.depth = 1;
-        // initialDomino is already pushed to dominoes and added to scene inside createDomino -> createDominoAt
+        // Ensure initialDomino is in the dominoes array (it might not have been pushed in createDominoAt depending on implementation, but let's be sure here if it's missing)
+        if (!dominoes.includes(initialDomino)) {
+            dominoes.push(initialDomino);
+        }
 
         activeDomino = initialDomino;
         selectedDominoes.add(initialDomino);
@@ -1977,12 +1976,12 @@
         updateGlobalStats();
 
         // Initial draw of the shape
-        drawDominoShape(DOMINO_WIDTH, DOMINO_HEIGHT, document.getElementById('geometry-select').value);
+
 
         // Update shape when geometry changes
         document.getElementById('geometry-select').addEventListener('change', (e) => {
             const type = e.target.value;
-            drawDominoShape(DOMINO_WIDTH, DOMINO_HEIGHT, type);
+
             logAction(`Geometry Changed: ${e.target.value}`);
         });
 
@@ -2022,7 +2021,7 @@
                     currentIndex++;
                     const color = isGradation ? getGradationColor(currentIndex, step) : null;
 
-                    const newDomino = createFullyOrientedDomino(newPos, lastQuat, color);
+                    const newDomino = createFullyOrientedDomino(newPos, lastQuat, color, last);
                     newDomino.depth = last.depth + 1;
                     newDomino.gradationIndex = currentIndex;
                     newDomino.depth = last.depth + 1;
@@ -2032,6 +2031,7 @@
 
                     // Connect graph
                     last.children.push(newDomino);
+                    newDomino.parent = last;
 
                     // Advance to the new domino
                     currentParent = newDomino;
@@ -2128,7 +2128,7 @@
 
                                 currentIndex++;
                                 const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color, currentParent);
                                 newDomino.gradationIndex = currentIndex;
                                 newDomino.depth = currentParent.depth + 1;
 
@@ -2136,6 +2136,7 @@
                                 createdDominoes.push(newDomino);
 
                                 currentParent.children.push(newDomino);
+                                newDomino.parent = currentParent;
                                 currentParent = newDomino;
                                 spiralStepIndex++;
                                 currentTheta += dTheta;
@@ -2167,7 +2168,7 @@
 
                                 currentIndex++;
                                 const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color, currentParent);
                                 newDomino.gradationIndex = currentIndex;
                                 newDomino.depth = currentParent.depth + 1;
 
@@ -2175,6 +2176,7 @@
                                 createdDominoes.push(newDomino);
 
                                 currentParent.children.push(newDomino);
+                                newDomino.parent = currentParent;
                                 currentParent = newDomino;
                                 spiralStepIndex++;
                             }
@@ -2213,7 +2215,7 @@
 
                             currentIndex++;
                             const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                            const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                            const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
                             newDomino.gradationIndex = currentIndex;
                             newDomino.depth = currentParent.depth + 1;
 
@@ -2316,7 +2318,7 @@
 
                                 currentIndex++;
                                 const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color, currentParent);
                                 newDomino.gradationIndex = currentIndex;
                                 newDomino.depth = currentParent.depth + 1;
 
@@ -2324,6 +2326,7 @@
                                 createdDominoes.push(newDomino);
 
                                 currentParent.children.push(newDomino);
+                                newDomino.parent = currentParent;
                                 currentParent = newDomino;
                                 spiralStepIndex++;
                                 currentTheta += dTheta;
@@ -2354,7 +2357,7 @@
 
                                 currentIndex++;
                                 const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color);
+                                const newDomino = createFullyOrientedDomino(nextPos, newQuat, color, currentParent);
                                 newDomino.gradationIndex = currentIndex;
                                 newDomino.depth = currentParent.depth + 1;
 
@@ -2362,6 +2365,7 @@
                                 createdDominoes.push(newDomino);
 
                                 currentParent.children.push(newDomino);
+                                newDomino.parent = currentParent;
                                 currentParent = newDomino;
                                 spiralStepIndex++;
                             }
@@ -2393,7 +2397,7 @@
 
                             currentIndex++;
                             const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                            const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                            const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
                             newDomino.gradationIndex = currentIndex;
                             newDomino.depth = currentParent.depth + 1;
 
@@ -2493,9 +2497,11 @@
 
                         // Restore original emissive
                         if (mesh.material.emissive) {
-                            const baseCol = mesh.userData.baseEmissive || 0x000000;
-                            const targetCol = new THREE.Color(baseCol);
-                            mesh.material.emissive.lerp(targetCol, factor);
+                            const baseColHex = mesh.userData.baseEmissive || 0x000000;
+                            const targetCol = new THREE.Color(baseColHex);
+                            const whiteCol = new THREE.Color(0xffffff);
+                            // Robust stateless interpolation from white to target
+                            mesh.material.emissive.copy(whiteCol).lerp(targetCol, factor);
                             mesh.material.emissiveIntensity = 2.0 - factor * 1.0;
                         }
                     } else {
@@ -2834,6 +2840,243 @@
             return btn;
         }
 
+        // --- Tree View Logic ---
+        const treeOverlay = document.getElementById('tree-overlay');
+        const treeCanvas = document.getElementById('tree-canvas');
+        const treeCtx = treeCanvas.getContext('2d');
+        let treeZoom = 1.0;
+        let treeOffset = { x: 0, y: 0 };
+        let isTreeDragging = false;
+        let lastTreePointer = { x: 0, y: 0 };
+        let treeNodeRenderData = []; // Stores {d, x, y} for hit detection
+
+        function updateTreeOverlaySize() {
+            const container = document.getElementById('tree-canvas-container');
+            treeCanvas.width = container.clientWidth;
+            treeCanvas.height = container.clientHeight;
+        }
+
+        function renderTree() {
+            if (treeOverlay.style.display === 'none') return;
+            updateTreeOverlaySize();
+            treeCtx.clearRect(0, 0, treeCanvas.width, treeCanvas.height);
+
+            if (dominoes.length === 0) return;
+
+            // Simple hierarchical layout
+            const nodes = [];
+            const levels = {};
+            const nodeById = {};
+
+            const findRoot = (d) => {
+                let curr = d;
+                while (curr.parent) curr = curr.parent;
+                return curr;
+            };
+
+            const root = findRoot(dominoes[0]);
+
+            const buildLayout = (node, depth, xOffset) => {
+                if (!levels[depth]) levels[depth] = 0;
+                const pos = { x: xOffset, y: depth * 100 };
+                nodeById[node.id] = { node, pos };
+                nodes.push(nodeById[node.id]);
+
+                if (node.children) {
+                    node.children.forEach((child, idx) => {
+                        buildLayout(child, depth + 1, xOffset + (idx - (node.children.length - 1) / 2) * 80);
+                    });
+                }
+            };
+
+            // Calculate layout starting from root
+            // For complex trees, this simple DFS might overlap branches, but works for basic chains/splits
+            let levelWidths = {};
+            const processNode = (node, depth) => {
+                if (levelWidths[depth] === undefined) levelWidths[depth] = 0;
+                const x = levelWidths[depth]++;
+                nodeById[node.id] = { node, x, y: depth };
+                if (node.children) {
+                    node.children.forEach(c => processNode(c, depth + 1));
+                }
+            };
+            processNode(root, 0);
+
+            // Draw connections
+            const margin = 50;
+            const stepX = 60;
+            const stepY = 80;
+
+            treeCtx.save();
+            treeCtx.translate(treeCanvas.width / 2 + treeOffset.x, 50 + treeOffset.y);
+            treeCtx.scale(treeZoom, treeZoom);
+
+            treeNodeRenderData = [];
+
+            // Draw edges
+            treeCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+            treeCtx.lineWidth = 2;
+            dominoes.forEach(d => {
+                const layout = nodeById[d.id];
+                if (layout && d.parent) {
+                    const parentLayout = nodeById[d.parent.id];
+                    if (parentLayout) {
+                        treeCtx.beginPath();
+                        treeCtx.moveTo((parentLayout.x - (levelWidths[parentLayout.y] - 1) / 2) * stepX, parentLayout.y * stepY);
+                        treeCtx.lineTo((layout.x - (levelWidths[layout.y] - 1) / 2) * stepX, layout.y * stepY);
+                        treeCtx.stroke();
+                    }
+                }
+            });
+
+            // Draw nodes
+            dominoes.forEach(d => {
+                const layout = nodeById[d.id];
+                if (layout) {
+                    const x = (layout.x - (levelWidths[layout.y] - 1) / 2) * stepX;
+                    const y = layout.y * stepY;
+
+                    treeNodeRenderData.push({ d, x, y });
+
+                    // Sphere color
+                    const mesh = d.group.children[0];
+                    const color = mesh.material.color.getStyle();
+
+                    treeCtx.beginPath();
+                    treeCtx.arc(x, y, 15, 0, Math.PI * 2);
+                    treeCtx.fillStyle = color;
+                    treeCtx.fill();
+                    treeCtx.strokeStyle = selectedDominoes.has(d) ? '#ff0000' : '#ffffff';
+                    treeCtx.lineWidth = selectedDominoes.has(d) ? 3 : 1;
+                    treeCtx.stroke();
+
+                    // ID text
+                    treeCtx.fillStyle = '#ffffff';
+                    treeCtx.font = '10px Arial';
+                    treeCtx.textAlign = 'center';
+                    treeCtx.fillText(d.id, x, y + 4);
+                }
+            });
+
+            treeCtx.restore();
+        }
+
+        const treeViewBtn = createButton('account_tree', () => {
+            treeOverlay.style.display = 'flex';
+            treeOffset = { x: 0, y: 0 };
+            treeZoom = 1.0;
+            renderTree();
+        }, '#4a90e2', '#357abd', 'Tree View');
+        treeViewBtn.id = 'tree-view-btn';
+
+        document.getElementById('close-tree-btn').addEventListener('click', () => {
+            treeOverlay.style.display = 'none';
+        });
+
+        document.getElementById('reset-tree-view-btn').addEventListener('click', () => {
+            treeOffset = { x: 0, y: 0 };
+            treeZoom = 1.0;
+            renderTree();
+        });
+
+        treeCanvas.addEventListener('mousedown', (e) => {
+            isTreeDragging = true;
+            lastTreePointer = { x: e.clientX, y: e.clientY };
+        });
+
+        treeCanvas.addEventListener('click', (e) => {
+            if (isTreeDragging) {
+                // Check if we actually moved much to avoid click triggering on slight drags
+                // But click event shouldn't fire if substantial movement happened generally?
+                // Actually 'click' fires after mouseup if no big movement.
+            }
+            const rect = treeCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const transformedX = (mouseX - (treeCanvas.width / 2 + treeOffset.x)) / treeZoom;
+            const transformedY = (mouseY - (50 + treeOffset.y)) / treeZoom;
+
+            // Hit detection
+            let hit = null;
+            for (const data of treeNodeRenderData) {
+                const dx = transformedX - data.x;
+                const dy = transformedY - data.y;
+                const distSq = dx * dx + dy * dy;
+                if (distSq <= 15 * 15 * 1.5) { // 1.5 multiplier for slightly larger hit area
+                    hit = data.d;
+                    break;
+                }
+            }
+
+            if (hit) {
+                if (selectedDominoes.has(hit)) {
+                    selectedDominoes.delete(hit);
+                    logAction(`Domino Deselected from Tree (ID: ${hit.id})`);
+                } else {
+                    const isMulti = document.getElementById('multi-select-check').checked || e.ctrlKey;
+                    if (!isMulti) selectedDominoes.clear();
+                    selectedDominoes.add(hit);
+                    activeDomino = hit;
+                    logAction(`Domino Selected from Tree (ID: ${hit.id})${e.ctrlKey ? ' [Ctrl]' : ''}`);
+                }
+                updateHighlights();
+                renderTree();
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isTreeDragging) return;
+            const dx = e.clientX - lastTreePointer.x;
+            const dy = e.clientY - lastTreePointer.y;
+            treeOffset.x += dx;
+            treeOffset.y += dy;
+            lastTreePointer = { x: e.clientX, y: e.clientY };
+            renderTree();
+        });
+
+        window.addEventListener('mouseup', () => {
+            isTreeDragging = false;
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (treeOverlay.style.display === 'flex' && e.code === 'Space') {
+                if (selectedDominoes.size === 0) return;
+                e.preventDefault();
+
+                const countBefore = selectedDominoes.size;
+                const targets = new Set(selectedDominoes);
+                const addDescendants = (d) => {
+                    if (d.children) {
+                        d.children.forEach(child => {
+                            if (!targets.has(child)) {
+                                targets.add(child);
+                                addDescendants(child);
+                            }
+                        });
+                    }
+                };
+
+                Array.from(selectedDominoes).forEach(d => addDescendants(d));
+                targets.forEach(t => selectedDominoes.add(t));
+
+                const newlySelected = selectedDominoes.size - countBefore;
+                if (newlySelected > 0) {
+                    updateHighlights();
+                    renderTree();
+                    logAction(`Selected ${newlySelected} Descendants from Tree [Space]`);
+                }
+            }
+        });
+
+        treeCanvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            treeZoom *= delta;
+            treeZoom = Math.max(0.1, Math.min(10, treeZoom));
+            renderTree();
+        }, { passive: false });
+
         function goUp() {
             if (selectedDominoes.size === 0) return;
 
@@ -2892,7 +3135,7 @@
 
                         currentIndex++;
                         const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
                         newDomino.gradationIndex = currentIndex;
                         newDomino.depth = currentParent.depth + 1;
 
@@ -2980,7 +3223,7 @@
 
                         currentIndex++;
                         const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color);
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
                         newDomino.gradationIndex = currentIndex;
                         newDomino.depth = currentParent.depth + 1;
 
@@ -3087,7 +3330,7 @@
                         // Calculate position: Center + Lateral * offset
                         const pos = currentPos.clone().add(lateral.clone().multiplyScalar(offset));
 
-                        const newDomino = createFullyOrientedDomino(pos, lastQuat, color);
+                        const newDomino = createFullyOrientedDomino(pos, lastQuat, color, currentLayer[i < currentLayer.length ? i : i - 1]);
                         newDomino.gradationIndex = currentIndex;
                         newDomino.depth = currentLayer[0].depth + 1;
 
@@ -3098,9 +3341,11 @@
                         // Connect parents
                         if (i > 0) {
                             currentLayer[i - 1].children.push(newDomino);
+                            newDomino.parent = currentLayer[i - 1];
                         }
                         if (i < currentLayer.length) {
                             currentLayer[i].children.push(newDomino);
+                            newDomino.parent = currentLayer[i];
                         }
                     }
                     currentLayer = nextLayer;
