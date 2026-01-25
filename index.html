@@ -1,3 +1,4 @@
+は
 <!DOCTYPE html>
 <html lang="en">
 
@@ -5,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Domino Effect</title>
+    <title>Sphere Hierarchy</title>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
         * {
@@ -291,6 +292,7 @@
             width: 100%;
             height: 100%;
             cursor: move;
+            touch-action: none;
         }
 
         #tree-controls {
@@ -357,6 +359,22 @@
             ">
                 <span class="material-icons">select_all</span>
             </button>
+            <button id="select-previous-btn" title="Select Previous" style="
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 8px;
+                color: white;
+                cursor: pointer;
+                width: 44px;
+                height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s;
+                margin-left: 5px;
+            ">
+                <span class="material-icons">restore</span>
+            </button>
             <button id="select-edges-btn" title="Select Edges (Spheres with no children)" style="
                 background: rgba(255, 255, 255, 0.1);
                 border: none;
@@ -372,6 +390,54 @@
                 margin-left: 5px;
             ">
                 <span class="material-icons">mediation</span>
+            </button>
+            <button id="delete-btn" title="Delete Selected and Descendants" style="
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 8px;
+                color: #ff4d4d;
+                cursor: pointer;
+                width: 44px;
+                height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s;
+                margin-left: 5px;
+            ">
+                <span class="material-icons">delete</span>
+            </button>
+            <button id="copy-btn" title="Copy Selected Subtree (Single Selection Only)" style="
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 8px;
+                color: #4a90e2;
+                cursor: pointer;
+                width: 44px;
+                height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s;
+                margin-left: 5px;
+            ">
+                <span class="material-icons">content_copy</span>
+            </button>
+            <button id="paste-btn" title="Paste Copied Subtree" style="
+                background: rgba(255, 255, 255, 0.1);
+                border: none;
+                border-radius: 8px;
+                color: #28a745;
+                cursor: pointer;
+                width: 44px;
+                height: 44px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background 0.2s;
+                margin-left: 5px;
+            ">
+                <span class="material-icons">content_paste</span>
             </button>
         </div>
 
@@ -693,6 +759,17 @@
             layoutBtn.style.background = 'rgba(30, 30, 30, 0.8)';
         });
 
+        // Hover effect for select-previous button
+        const selectPrevBtn = document.getElementById('select-previous-btn');
+        selectPrevBtn.addEventListener('mouseover', () => {
+            selectPrevBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+            selectPrevBtn.style.transform = 'scale(1.1)';
+        });
+        selectPrevBtn.addEventListener('mouseout', () => {
+            selectPrevBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            selectPrevBtn.style.transform = 'scale(1)';
+        });
+
 
     </script>
     <script type="module">
@@ -748,7 +825,7 @@
 
                 const now = new Date();
                 const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
-                a.download = `domino_history_${timestamp}.txt`;
+                a.download = `sphere_history_${timestamp}.txt`;
 
                 document.body.appendChild(a);
                 a.click();
@@ -761,6 +838,7 @@
         });
 
         // --- Import and Replay Logic ---
+        let clipboard = null; // Stores copied subtree data
         let replayQueue = [];
         let currentReplayIndex = 0;
         let lastReplayCommandType = null; // Track previous command type for selection logic
@@ -799,8 +877,12 @@
                 // Remove timestamp [HH:MM:SS]
                 const message = line.replace(/^\[.*?\]\s*/, '').trim();
 
-                if (message === "Added Domino") {
-                    replayQueue.push({ type: 'addDomino' });
+                if (message.startsWith("Added 2 Spheres")) {
+                    const match = message.match(/\((.*?)\)/);
+                    const direction = match ? match[1].toLowerCase() : 'straight';
+                    replayQueue.push({ type: 'addSpheresDirectional', direction: direction });
+                } else if (message === "Added Domino" || message === "Added Sphere") {
+                    replayQueue.push({ type: 'addSpheresDirectional', direction: 'straight' });
                 } else if (message.startsWith("Turned Left")) {
                     const radiusMatch = message.match(/Radius: (\d+)/);
                     const branchMatch = message.match(/Branch: (\d+)/);
@@ -844,7 +926,7 @@
                     replayQueue.push({ type: 'startAnimation' });
                 } else if (message === "Animation Reset") {
                     replayQueue.push({ type: 'resetAnimation' });
-                } else if (message.startsWith("Domino Selected")) {
+                } else if (message.startsWith("Sphere Selected") || message.startsWith("Domino Selected")) {
                     const idMatch = message.match(/ID:\s*(\d+)/);
                     if (idMatch) {
                         const id = parseInt(idMatch[1], 10);
@@ -852,7 +934,7 @@
                         const isDescendants = message.includes("+ descendants");
                         replayQueue.push({ type: 'selectDomino', id: id, isMulti: isMulti, isDescendants: isDescendants });
                     }
-                } else if (message.startsWith("Domino Deselected")) {
+                } else if (message.startsWith("Sphere Deselected") || message.startsWith("Domino Deselected")) {
                     const idMatch = message.match(/ID:\s*(\d+)/);
                     if (idMatch) {
                         const id = parseInt(idMatch[1], 10);
@@ -892,9 +974,9 @@
                     replayQueue.push({ type: 'setGradationStep', step: step });
                 } else if (message === "Undo Performed") {
                     replayQueue.push({ type: 'undo' });
-                } else if (message === "Selected All Dominoes") {
+                } else if (message === "Selected All Spheres" || message === "Selected All Dominoes") {
                     replayQueue.push({ type: 'selectAll' });
-                } else if (message === "Selected Edge Dominoes") {
+                } else if (message === "Selected Edge Spheres" || message === "Selected Edge Dominoes") {
                     replayQueue.push({ type: 'selectEdges' });
                 } else if (message === "Ground Selected") {
                     replayQueue.push({ type: 'selectGround' });
@@ -992,19 +1074,50 @@
             updateReplayStatus();
         });
 
+        // --- Selection History System ---
+        let selectionHistory = [];
+        function recordSelectionHistory() {
+            selectionHistory.push({
+                selected: new Set(selectedDominoes),
+                active: activeDomino
+            });
+            if (selectionHistory.length > 50) selectionHistory.shift();
+        }
+
+        document.getElementById('select-previous-btn').addEventListener('click', () => {
+            if (selectionHistory.length === 0) {
+                logAction("No previous selection history");
+                return;
+            }
+            const previousState = selectionHistory.pop();
+            selectedDominoes.clear();
+            previousState.selected.forEach(d => {
+                if (dominoes.includes(d)) {
+                    selectedDominoes.add(d);
+                }
+            });
+            activeDomino = previousState.active;
+            if (activeDomino && !dominoes.includes(activeDomino)) activeDomino = null;
+
+            updateHighlights();
+            logAction("Restored Previous Selection");
+        });
+
         // Select All Logic
         document.getElementById('select-all-btn').addEventListener('click', () => {
             if (dominoes.length > 0) {
+                recordSelectionHistory();
                 dominoes.forEach(d => selectedDominoes.add(d));
                 activeDomino = dominoes[dominoes.length - 1];
                 updateHighlights();
-                logAction("Selected All Dominoes");
+                logAction("Selected All Spheres");
             }
         });
 
         // Select Edges Logic
         document.getElementById('select-edges-btn').addEventListener('click', () => {
             if (dominoes.length > 0) {
+                recordSelectionHistory();
                 selectedDominoes.clear();
                 dominoes.forEach(d => {
                     if (d.children && d.children.length === 0) {
@@ -1017,7 +1130,7 @@
                     activeDomino = null;
                 }
                 updateHighlights();
-                logAction("Selected Edge Dominoes");
+                logAction("Selected Edge Spheres");
             }
         });
 
@@ -1043,10 +1156,103 @@
             selectEdgesBtn.style.transform = 'scale(1)';
         });
 
+        // Hover effect for the delete button
+        const deleteBtn = document.getElementById('delete-btn');
+        deleteBtn.addEventListener('mouseover', () => {
+            deleteBtn.style.background = 'rgba(255, 0, 0, 0.2)';
+            deleteBtn.style.transform = 'scale(1.1)';
+        });
+        deleteBtn.addEventListener('mouseout', () => {
+            deleteBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            deleteBtn.style.transform = 'scale(1)';
+        });
+
+        deleteBtn.addEventListener('click', () => {
+            deleteSelected();
+        });
+
+        // Hover effect for the copy button
+        const copyBtn = document.getElementById('copy-btn');
+        copyBtn.addEventListener('mouseover', () => {
+            copyBtn.style.background = 'rgba(74, 144, 226, 0.2)';
+            copyBtn.style.transform = 'scale(1.1)';
+        });
+        copyBtn.addEventListener('mouseout', () => {
+            copyBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            copyBtn.style.transform = 'scale(1)';
+        });
+
+        copyBtn.addEventListener('click', () => {
+            copySelectedSubtree();
+        });
+
+        // Hover effect for the paste button
+        const pasteBtn = document.getElementById('paste-btn');
+        pasteBtn.addEventListener('mouseover', () => {
+            pasteBtn.style.background = 'rgba(40, 167, 69, 0.2)';
+            pasteBtn.style.transform = 'scale(1.1)';
+        });
+        pasteBtn.addEventListener('mouseout', () => {
+            pasteBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            pasteBtn.style.transform = 'scale(1)';
+        });
+
+        pasteBtn.addEventListener('click', () => {
+            pasteSubtree();
+        });
+
+        function deleteSelected() {
+            if (selectedDominoes.size === 0) return;
+
+            const toDelete = new Set();
+            const collectDescendants = (d) => {
+                toDelete.add(d);
+                if (d.children) {
+                    d.children.forEach(child => {
+                        if (!toDelete.has(child)) {
+                            collectDescendants(child);
+                        }
+                    });
+                }
+            };
+
+            selectedDominoes.forEach(d => collectDescendants(d));
+
+            logAction(`Deleted ${toDelete.size} Spheres`);
+
+            toDelete.forEach(d => {
+                // Remove from scene
+                scene.remove(d.group);
+
+                // Remove from parent's children
+                if (d.parent && d.parent.children) {
+                    const idx = d.parent.children.indexOf(d);
+                    if (idx > -1) d.parent.children.splice(idx, 1);
+                }
+
+                // Remove from global array
+                const idx = dominoes.indexOf(d);
+                if (idx > -1) dominoes.splice(idx, 1);
+
+                // Remove from selection
+                selectedDominoes.delete(d);
+            });
+
+            if (activeDomino && toDelete.has(activeDomino)) {
+                activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
+            }
+
+            updateHighlights();
+            updateGlobalStats();
+        }
+
         function executeCommand(cmd) {
             switch (cmd.type) {
+                case 'addSpheresDirectional':
+                    addSpheresDirectional(cmd.direction);
+                    break;
                 case 'addDomino':
-                    addDomino();
+                    addSpheresDirectional('straight');
                     break;
                 case 'turnLeft':
                     document.getElementById('radius-select').value = cmd.radius;
@@ -1290,6 +1496,9 @@
                     break;
                 case 'setUpDownOffset':
                     document.getElementById('updown-offset').value = cmd.offset;
+                    break;
+                case 'delete':
+                    deleteSelected();
                     break;
             }
             lastReplayCommandType = cmd.type; // Track for next command's selection behavior
@@ -1605,12 +1814,10 @@
         targetCrosshair.add(zLine);
         // scene.add(targetCrosshair);
 
-        // --- Ground Removed ---
-
         const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
-        // scene.add(gridHelper); // Removed to clip grid to circle
+        scene.add(gridHelper); // Restored grid
 
-        // Grid Removed
+
 
         // --- Axes Helper ---
         // Removed as per user request
@@ -1827,7 +2034,7 @@
             const sphereMat = bodyMaterial.clone();
 
             const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
-            sphereMesh.position.set(0, 0.1, 0);
+            sphereMesh.position.set(0, 0, 0); // Center at pivot
             sphereMesh.visible = true;
             sphereMesh.scale.set(1, 1, 1);
             sphereMesh.castShadow = true;
@@ -1896,7 +2103,7 @@
             // Create sphere instead of domino
             const sphereGeo = new THREE.SphereGeometry(0.1, 32, 32);
             const sphereMesh = new THREE.Mesh(sphereGeo, bodyMaterial.clone());
-            sphereMesh.position.set(0, 0.1, 0); // Center at radius height
+            sphereMesh.position.set(0, 0, 0); // Center at pivot
             sphereMesh.visible = true;
             sphereMesh.scale.set(1, 1, 1);
 
@@ -1985,61 +2192,80 @@
             logAction(`Geometry Changed: ${e.target.value}`);
         });
 
-        function addDomino() {
+        function addSpheresDirectional(direction = 'straight') {
             if (selectedDominoes.size === 0) return;
+            recordSelectionHistory();
 
             const newSelection = new Set();
-            const previousSelection = new Set(selectedDominoes); // Capture selection BEFORE modification
+            const previousSelection = new Set(selectedDominoes);
             const createdDominoes = [];
 
             const currentSelection = Array.from(selectedDominoes);
+            // For 'straight' direction, ignore Branch parameter and always use 1 branch (2 spheres)
+            const branchCount = direction === 'straight' ? 1 : parseInt(document.getElementById('branch-select').value, 10);
 
             currentSelection.forEach(selectedDomino => {
                 let currentParent = selectedDomino;
                 let currentIndex = (currentParent.gradationIndex !== undefined) ? currentParent.gradationIndex : 0;
                 const isGradation = document.getElementById('gradation-check').checked;
                 const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                const lastQuat = currentParent.group.quaternion;
 
-                for (let i = 0; i < 2; i++) {
-                    const last = currentParent;
-                    const lastPos = last.group.position;
-                    const lastQuat = last.group.quaternion;
+                for (let b = 0; b < branchCount; b++) {
+                    let branchParent = currentParent;
+                    let branchIndex = currentIndex;
 
-                    // Forward vector in local space is +Z (0, 0, 1)
-                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
-                    // Up vector in local space is +Y (0, 1, 0)
-                    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                    // Branch Rotation (around local Z / Forward)
+                    const branchRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), (b * 2 * Math.PI) / branchCount);
 
-                    const isUpDown = document.getElementById('updown-mode-check').checked;
-                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
-
-                    let newPos = lastPos.clone().add(forward.multiplyScalar(DOMINO_SPACING));
-                    if (isUpDown) {
-                        newPos.add(up.multiplyScalar(yOffset));
+                    // Direction Rotation (relative to the branched frame)
+                    let directionRot = new THREE.Quaternion();
+                    switch (direction) {
+                        case 'up': directionRot.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2); break;
+                        case 'down': directionRot.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2); break;
+                        case 'left': directionRot.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2); break;
+                        case 'right': directionRot.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2); break;
+                        case 'straight': directionRot.identity(); break;
                     }
 
-                    currentIndex++;
-                    const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                    // Combined Rotation
+                    const segmentQuat = lastQuat.clone().multiply(branchRot).multiply(directionRot);
+                    const directionVec = new THREE.Vector3(0, 0, 1).applyQuaternion(segmentQuat);
 
-                    const newDomino = createFullyOrientedDomino(newPos, lastQuat, color, last);
-                    newDomino.depth = last.depth + 1;
-                    newDomino.gradationIndex = currentIndex;
-                    newDomino.depth = last.depth + 1;
+                    for (let i = 0; i < 2; i++) {
+                        const last = branchParent;
+                        const lastPos = last.group.position;
 
-                    dominoes.push(newDomino);
-                    createdDominoes.push(newDomino); // Add to created list
+                        const isUpDown = document.getElementById('updown-mode-check').checked;
+                        const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                    // Connect graph
-                    last.children.push(newDomino);
-                    newDomino.parent = last;
+                        let newPos = lastPos.clone().add(directionVec.clone().multiplyScalar(DOMINO_SPACING));
 
-                    // Advance to the new domino
-                    currentParent = newDomino;
+                        if (isUpDown) {
+                            const up = new THREE.Vector3(0, 1, 0).applyQuaternion(segmentQuat);
+                            newPos.add(up.multiplyScalar(yOffset));
+                        }
+
+                        branchIndex++;
+                        const color = isGradation ? getGradationColor(branchIndex, step) : null;
+
+                        // Create sphere (centered at 0,0,0 in group as per accuracy fix)
+                        const newDomino = createFullyOrientedDomino(newPos, segmentQuat, color, last);
+                        newDomino.depth = last.depth + 1;
+                        newDomino.gradationIndex = branchIndex;
+
+                        dominoes.push(newDomino);
+                        createdDominoes.push(newDomino);
+
+                        last.children.push(newDomino);
+                        newDomino.parent = last;
+
+                        branchParent = newDomino;
+                    }
+                    newSelection.add(branchParent);
                 }
-                newSelection.add(currentParent);
             });
 
-            // Update selection to the newly created dominoes
             selectedDominoes.clear();
             newSelection.forEach(d => selectedDominoes.add(d));
 
@@ -2051,12 +2277,13 @@
 
             updateHighlights();
             recordUndo('creation', createdDominoes, previousSelection);
-            logAction("Added Domino");
+            logAction(`Added Spheres (${direction}) x ${branchCount}`);
             updateGlobalStats();
         }
 
         function turnLeft() {
             if (selectedDominoes.size === 0) return;
+            recordSelectionHistory();
 
             const newSelection = new Set();
             const previousSelection = new Set(selectedDominoes);
@@ -2249,6 +2476,7 @@
 
         function turnRight() {
             if (selectedDominoes.size === 0) return;
+            recordSelectionHistory();
 
             const newSelection = new Set();
             const previousSelection = new Set(selectedDominoes);
@@ -2979,17 +3207,19 @@
             renderTree();
         });
 
+        let isDraggingConfirmed = false;
+        let dragThreshold = 5; // pixels
+        let initialPinchDistance = 0;
+        let initialZoom = 1;
+
         treeCanvas.addEventListener('mousedown', (e) => {
             isTreeDragging = true;
+            isDraggingConfirmed = false;
             lastTreePointer = { x: e.clientX, y: e.clientY };
         });
 
         treeCanvas.addEventListener('click', (e) => {
-            if (isTreeDragging) {
-                // Check if we actually moved much to avoid click triggering on slight drags
-                // But click event shouldn't fire if substantial movement happened generally?
-                // Actually 'click' fires after mouseup if no big movement.
-            }
+            if (isDraggingConfirmed) return;
             const rect = treeCanvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
@@ -3029,10 +3259,70 @@
             if (!isTreeDragging) return;
             const dx = e.clientX - lastTreePointer.x;
             const dy = e.clientY - lastTreePointer.y;
-            treeOffset.x += dx;
-            treeOffset.y += dy;
-            lastTreePointer = { x: e.clientX, y: e.clientY };
-            renderTree();
+
+            if (!isDraggingConfirmed) {
+                if (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold) {
+                    isDraggingConfirmed = true;
+                }
+            }
+
+            if (isDraggingConfirmed) {
+                treeOffset.x += dx;
+                treeOffset.y += dy;
+                lastTreePointer = { x: e.clientX, y: e.clientY };
+                renderTree();
+            }
+        });
+
+        // Touch Support
+        treeCanvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                isTreeDragging = true;
+                isDraggingConfirmed = false;
+                lastTreePointer = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                isTreeDragging = false;
+                const d = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                initialPinchDistance = d;
+                initialZoom = treeZoom;
+            }
+        }, { passive: false });
+
+        treeCanvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (e.touches.length === 1 && isTreeDragging) {
+                const dx = e.touches[0].clientX - lastTreePointer.x;
+                const dy = e.touches[0].clientY - lastTreePointer.y;
+
+                if (!isDraggingConfirmed) {
+                    if (Math.abs(dx) > dragThreshold || Math.abs(dy) > dragThreshold) {
+                        isDraggingConfirmed = true;
+                    }
+                }
+
+                if (isDraggingConfirmed) {
+                    treeOffset.x += dx;
+                    treeOffset.y += dy;
+                    lastTreePointer = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    renderTree();
+                }
+            } else if (e.touches.length === 2) {
+                const d = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const zoomFactor = d / initialPinchDistance;
+                treeZoom = initialZoom * zoomFactor;
+                treeZoom = Math.max(0.1, Math.min(10, treeZoom));
+                renderTree();
+            }
+        }, { passive: false });
+
+        treeCanvas.addEventListener('touchend', (e) => {
+            isTreeDragging = false;
         });
 
         window.addEventListener('mouseup', () => {
@@ -3079,6 +3369,7 @@
 
         function goUp() {
             if (selectedDominoes.size === 0) return;
+            recordSelectionHistory();
 
             const newSelection = new Set();
             const previousSelection = new Set(selectedDominoes);
@@ -3166,6 +3457,7 @@
 
         function goDown() {
             if (selectedDominoes.size === 0) return;
+            recordSelectionHistory();
 
             const newSelection = new Set();
             const previousSelection = new Set(selectedDominoes);
@@ -3254,6 +3546,7 @@
 
         function splitNWay() {
             if (selectedDominoes.size === 0) return;
+            recordSelectionHistory();
 
             const targetN = parseInt(document.getElementById('n-way-select').value, 10);
             const newSelection = new Set();
@@ -3370,10 +3663,30 @@
             updateGlobalStats();
         }
 
-        createButton("add_box", () => {
-            addDomino();
+        createButton("straight", () => {
+            addSpheresDirectional('straight');
             playClickSound();
-        }, '#4facfe', '#00f2fe', "Add Domino");
+        }, '#4facfe', '#00f2fe', "Add Sphere (Straight)");
+
+        createButton("arrow_upward", () => {
+            addSpheresDirectional('up');
+            playClickSound();
+        }, '#4facfe', '#00f2fe', "Add Sphere (Up)");
+
+        createButton("arrow_downward", () => {
+            addSpheresDirectional('down');
+            playClickSound();
+        }, '#4facfe', '#00f2fe', "Add Sphere (Down)");
+
+        createButton("arrow_back", () => {
+            addSpheresDirectional('left');
+            playClickSound();
+        }, '#4facfe', '#00f2fe', "Add Sphere (Left)");
+
+        createButton("arrow_forward", () => {
+            addSpheresDirectional('right');
+            playClickSound();
+        }, '#4facfe', '#00f2fe', "Add Sphere (Right)");
 
         createButton("undo", () => {
             undoLastAction();
@@ -3528,6 +3841,8 @@
                         addDescendants(clickedDomino);
                     }
 
+                    recordSelectionHistory();
+
                     if (isMultiMode) {
                         // Toggle selection based on the clicked domino
                         const isRemoving = selectedDominoes.has(clickedDomino);
@@ -3542,20 +3857,17 @@
 
                         // Update activeDomino
                         if (isRemoving) {
-                            if (activeDomino === clickedDomino || !selectedDominoes.has(activeDomino)) {
-                                activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
-                            }
-                            logAction(`Domino Deselected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''}) [Multi]`);
+                            logAction(`Sphere Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''}) [Multi]`);
                         } else {
                             activeDomino = clickedDomino;
-                            logAction(`Domino Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''}) [Multi]`);
+                            logAction(`Sphere Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''}) [Multi]`);
                         }
                     } else {
                         // Single selection (or single branch selection)
                         selectedDominoes.clear();
                         targets.forEach(t => selectedDominoes.add(t));
                         activeDomino = clickedDomino;
-                        logAction(`Domino Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''})`);
+                        logAction(`Sphere Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''})`);
                     }
 
                     selectedType = 'domino';
@@ -3567,6 +3879,9 @@
             if (!clickedOnDomino) {
                 // Background (or nothing)
                 if (event.target === renderer.domElement) {
+                    if (selectedDominoes.size > 0) {
+                        recordSelectionHistory();
+                    }
                     selectedDominoes.clear();
                     activeDomino = null;
                     updateHighlights();
@@ -3599,6 +3914,115 @@
                 undoLastAction();
             }
         });
+
+        function copySelectedSubtree() {
+            if (selectedDominoes.size !== 1) {
+                alert("Please select exactly one Sphere to copy.");
+                return;
+            }
+
+            const root = Array.from(selectedDominoes)[0];
+            const nodes = [];
+            const nodeToIndex = new Map();
+
+            const collect = (node, parentIdx) => {
+                const idx = nodes.length;
+                nodeToIndex.set(node, idx);
+
+                // Calculate relative position to root in root's local space
+                const worldPos = node.group.position.clone();
+                const relPos = worldPos.sub(root.group.position).applyQuaternion(root.group.quaternion.clone().invert());
+
+                // Calculate relative orientation
+                // Q_world_node = Q_world_root * Q_rel_node  =>  Q_rel_node = Q_world_root^-1 * Q_world_node
+                const relQuat = root.group.quaternion.clone().invert().multiply(node.group.quaternion);
+
+                const mesh = node.group.children[0];
+                const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+
+                nodes.push({
+                    parentIdx: parentIdx,
+                    relPos: relPos,
+                    relQuat: relQuat,
+                    color: mat.color.getHex(),
+                    geometryType: mesh.userData.geometryType || document.getElementById('geometry-select').value,
+                    materialType: document.getElementById('material-select').value // Simplified
+                });
+
+                if (node.children) {
+                    node.children.forEach(child => collect(child, idx));
+                }
+            };
+
+            collect(root, -1);
+            clipboard = nodes;
+            logAction(`Copied subtree with ${nodes.length} spheres`);
+        }
+
+        function pasteSubtree() {
+            if (!clipboard || clipboard.length === 0) {
+                alert("Clipboard is empty. Copy a Sphere first.");
+                return;
+            }
+
+            if (selectedDominoes.size === 0) {
+                alert("Please select target Spheres to paste onto.");
+                return;
+            }
+
+            recordSelectionHistory();
+            const currentSelection = Array.from(selectedDominoes);
+            const createdAll = [];
+            const previousSelection = new Set(selectedDominoes);
+
+            const rootData = clipboard[0];
+
+            currentSelection.forEach(target => {
+                // Style the target like the root of the copy
+                const targetMesh = target.group.children[0];
+                const targetMat = Array.isArray(targetMesh.material) ? targetMesh.material[0] : targetMesh.material;
+                targetMat.color.setHex(rootData.color);
+
+                // Track newly created spheres to maintain hierarchy during this paste operation
+                const indexToSpheres = new Map();
+                indexToSpheres.set(0, target);
+
+                for (let i = 1; i < clipboard.length; i++) {
+                    const data = clipboard[i];
+                    const parent = indexToSpheres.get(data.parentIdx);
+                    if (!parent) continue;
+
+                    // Root's pose (the target sphere)
+                    const rootPos = target.group.position;
+                    const rootQuat = target.group.quaternion;
+
+                    // Calculate world pos/quat for the new sphere
+                    const newPos = data.relPos.clone().applyQuaternion(rootQuat).add(rootPos);
+                    const newQuat = rootQuat.clone().multiply(data.relQuat);
+
+                    // Create the new sphere
+                    const newSphere = createFullyOrientedDomino(newPos, newQuat, data.color, parent);
+                    newSphere.depth = parent.depth + 1;
+
+                    dominoes.push(newSphere);
+                    createdAll.push(newSphere);
+
+                    // Link hierarchy
+                    parent.children.push(newSphere);
+                    indexToSpheres.set(i, newSphere);
+                }
+            });
+
+            if (createdAll.length > 0) {
+                recordUndo('creation', createdAll, previousSelection);
+                logAction(`Pasted subtree to ${currentSelection.length} spheres (Added ${createdAll.length} spheres)`);
+            } else {
+                logAction(`Updated ${currentSelection.length} spheres to match copied root`);
+            }
+
+            updateHighlights();
+            updateGlobalStats();
+        }
 
         animate();
     </script>
