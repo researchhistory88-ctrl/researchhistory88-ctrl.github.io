@@ -27,7 +27,7 @@
             text-align: center;
             pointer-events: none;
             color: white;
-            z-index: 1;
+            z-index: 1000;
         }
 
         #start-btn {
@@ -774,6 +774,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { TransformControls } from 'three/addons/controls/TransformControls.js';
         import { OBB } from 'three/addons/math/OBB.js';
 
         // --- Logging Helper ---
@@ -850,6 +851,7 @@
         const replayStatus = document.getElementById('replay-status');
 
         importBtn.addEventListener('click', () => {
+            importFile.value = '';
             importFile.click();
         });
 
@@ -1653,16 +1655,20 @@
         function updateGlobalStats() {
             if (!statsDisplay) return;
             if (dominoes.length === 0) {
-                statsDisplay.textContent = `Max Depth: 0 | Spheres: 0 | Max Width: 0`;
+                statsDisplay.textContent = `Max Depth: 0 | Spheres: 0 | Leaves: 0 | Max Width: 0`;
                 return;
             }
 
             let maxDepth = 0;
+            let leafCount = 0;
             const depthCounts = {};
 
             dominoes.forEach(d => {
                 if (d.depth > maxDepth) maxDepth = d.depth;
                 depthCounts[d.depth] = (depthCounts[d.depth] || 0) + 1;
+                if (!d.children || d.children.length === 0) {
+                    leafCount++;
+                }
             });
 
             let maxWidth = 0;
@@ -1672,7 +1678,7 @@
                 }
             }
 
-            statsDisplay.textContent = `Max Depth: ${maxDepth} | Spheres: ${dominoes.length} | Max Width: ${maxWidth}`;
+            statsDisplay.textContent = `Max Depth: ${maxDepth} | Spheres: ${dominoes.length} | Leaves: ${leafCount} | Max Width: ${maxWidth}`;
         }
 
         // --- Scene Setup ---
@@ -1714,6 +1720,26 @@
             controls.target.set(-4.19, 0.16, 3.72);
         }
         controls.update();
+
+        // Transform Controls Setup
+        const transformControl = new TransformControls(camera, renderer.domElement);
+        transformControl.addEventListener('dragging-changed', function (event) {
+            controls.enabled = !event.value;
+        });
+        transformControl.addEventListener('change', function () {
+            if (activeDomino && selectedDominoes.has(activeDomino)) {
+                // Synchronization Logic: Apply active domino's rotation to all selected dominoes
+                const activeRot = activeDomino.group.quaternion;
+                selectedDominoes.forEach(d => {
+                    if (d !== activeDomino) {
+                        d.group.quaternion.copy(activeRot);
+                    }
+                });
+            }
+        });
+        scene.add(transformControl);
+
+        let isOrientationEditMode = false;
 
         // --- Layout Toggle with Camera Reset ---
         const layoutToggleBtn = document.getElementById('layout-toggle-btn');
@@ -2178,6 +2204,30 @@
 
         // Helper to update highlights
         function updateHighlights() {
+            // Update Coordinate Display
+            try {
+                const coordDisplay = document.getElementById('coord-display');
+                if (coordDisplay) {
+                    // Ensure the element is visible
+                    coordDisplay.style.display = 'block';
+
+                    if (activeDomino && selectedDominoes.has(activeDomino) && activeDomino.group && activeDomino.group.position) {
+                        const pos = activeDomino.group.position;
+                        coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Depth: ${activeDomino.depth}`;
+                    } else {
+                        coordDisplay.textContent = `X: - Y: - Z: - | Depth: -`;
+                    }
+                }
+
+                // Update Transform Controls
+                if (isOrientationEditMode && activeDomino && selectedDominoes.has(activeDomino)) {
+                    transformControl.attach(activeDomino.group);
+                } else {
+                    transformControl.detach();
+                }
+            } catch (e) {
+                console.error("Error updating coordinates:", e);
+            }
             // Remove existing arrows
             orientationArrows.forEach(arrow => scene.remove(arrow));
             upArrows.forEach(arrow => scene.remove(arrow));
@@ -2292,7 +2342,7 @@
                     }
 
                     // Combined Rotation
-                    const segmentQuat = lastQuat.clone().multiply(branchRot).multiply(directionRot);
+                    const segmentQuat = lastQuat.clone().multiply(branchRot).multiply(directionRot).normalize();
                     const directionVec = new THREE.Vector3(0, 0, 1).applyQuaternion(segmentQuat);
 
                     const addNum = parseInt(document.getElementById('radius-select').value, 10);
@@ -2685,7 +2735,7 @@
                             }
 
                             const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, -rad);
-                            const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+                            const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat).normalize();
 
                             currentIndex++;
                             const color = isGradation ? getGradationColor(currentIndex, step) : null;
@@ -2834,13 +2884,11 @@
             targetCrosshair.position.copy(controls.target);
 
             const coordDisplay = document.getElementById('coord-display');
-
-            if (coordDisplay) {
-                let text = `Camera: X: ${camera.position.x.toFixed(2)} Y: ${camera.position.y.toFixed(2)} Z: ${camera.position.z.toFixed(2)}<br>Target: X: ${controls.target.x.toFixed(2)} Y: ${controls.target.y.toFixed(2)} Z: ${controls.target.z.toFixed(2)}`;
-                if (activeDomino) {
-                    text += `<br>Selected Domino Depth: ${activeDomino.depth || 'N/A'}`;
-                }
-                coordDisplay.innerHTML = text;
+            if (activeDomino && selectedDominoes.has(activeDomino) && activeDomino.group && activeDomino.group.position) {
+                const pos = activeDomino.group.position;
+                if (coordDisplay) coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Depth: ${activeDomino.depth}`;
+            } else {
+                if (coordDisplay) coordDisplay.textContent = `X: 0.00 Y: 0.00 Z: 0.00 | Depth: -`;
             }
 
             renderer.render(scene, camera);
@@ -3486,7 +3534,7 @@
 
                         // New Rotation: Rotate original quaternion around local right, then incorporate branch rotation
                         const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, -theta);
-                        const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+                        const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat).normalize();
 
                         currentIndex++;
                         const color = isGradation ? getGradationColor(currentIndex, step) : null;
@@ -3575,7 +3623,7 @@
 
                         // New Rotation: Rotate original quaternion around local right, then incorporate branch rotation
                         const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, theta);
-                        const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+                        const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat).normalize();
 
                         currentIndex++;
                         const color = isGradation ? getGradationColor(currentIndex, step) : null;
@@ -3945,6 +3993,23 @@
         createButton("visibility", () => {
             startExhibition();
         }, '#9C27B0', '#7B1FA2', 'Exhibition Mode');
+
+        // Orientation Edit Button
+        createButton("3d_rotation", () => {
+            isOrientationEditMode = !isOrientationEditMode;
+            if (isOrientationEditMode) {
+                if (activeDomino) {
+                    transformControl.attach(activeDomino.group);
+                    transformControl.setMode('rotate');
+                    logAction("Orientation Edit Mode: ON");
+                } else {
+                    logAction("Orientation Edit Mode: ON (Select a sphere)");
+                }
+            } else {
+                transformControl.detach();
+                logAction("Orientation Edit Mode: OFF");
+            }
+        }, '#E91E63', '#C2185B', 'Orientation Edit');
 
         // Cannon button removed as per user request
 
