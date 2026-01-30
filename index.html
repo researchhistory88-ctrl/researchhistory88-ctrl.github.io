@@ -336,6 +336,10 @@
                 style="background: rgba(0, 0, 0, 0.5); padding: 5px; border-radius: 4px; margin-top: 5px; font-size: 13px;">
                 Max Depth: 1 | Spheres: 1 | Width: 0.00
             </div>
+            <div id="rotation-display"
+                style="background: rgba(255, 100, 0, 0.8); padding: 8px; border-radius: 4px; margin-top: 5px; font-size: 14px; font-weight: bold; display: none;">
+                X: 0° Y: 0° Z: 0°
+            </div>
         </div>
     </div>
 
@@ -1723,18 +1727,69 @@
 
         // Transform Controls Setup
         const transformControl = new TransformControls(camera, renderer.domElement);
+
+        // Store initial quaternions for relative rotation
+        let initialActiveQuaternion = new THREE.Quaternion();
+        let initialDominoQuaternions = new Map();
+
         transformControl.addEventListener('dragging-changed', function (event) {
             controls.enabled = !event.value;
+            const rotationDisplay = document.getElementById('rotation-display');
+
+            if (event.value && activeDomino && selectedDominoes.has(activeDomino)) {
+                // Drag started: store initial quaternions and show rotation display
+                initialActiveQuaternion.copy(activeDomino.group.quaternion);
+                initialDominoQuaternions.clear();
+                selectedDominoes.forEach(d => {
+                    initialDominoQuaternions.set(d, d.group.quaternion.clone());
+                });
+                rotationDisplay.style.display = 'block';
+            } else {
+                // Drag ended: hide rotation display
+                rotationDisplay.style.display = 'none';
+            }
         });
+
         transformControl.addEventListener('change', function () {
-            if (activeDomino && selectedDominoes.has(activeDomino)) {
-                // Synchronization Logic: Apply active domino's rotation to all selected dominoes
-                const activeRot = activeDomino.group.quaternion;
+            if (activeDomino && selectedDominoes.has(activeDomino) && initialDominoQuaternions.size > 0) {
+                // Apply 5-degree snap to active domino
+                const euler = new THREE.Euler().setFromQuaternion(activeDomino.group.quaternion, 'YXZ');
+                const snapAngle = THREE.MathUtils.degToRad(5);
+
+                // Snap each axis to nearest 5-degree increment
+                euler.x = Math.round(euler.x / snapAngle) * snapAngle;
+                euler.y = Math.round(euler.y / snapAngle) * snapAngle;
+                euler.z = Math.round(euler.z / snapAngle) * snapAngle;
+
+                // Apply snapped rotation back to active domino
+                activeDomino.group.quaternion.setFromEuler(euler);
+
+                // Update rotation display
+                const rotationDisplay = document.getElementById('rotation-display');
+                const xDeg = THREE.MathUtils.radToDeg(euler.x).toFixed(0);
+                const yDeg = THREE.MathUtils.radToDeg(euler.y).toFixed(0);
+                const zDeg = THREE.MathUtils.radToDeg(euler.z).toFixed(0);
+                rotationDisplay.textContent = `X: ${xDeg}° Y: ${yDeg}° Z: ${zDeg}°`;
+
+                // Calculate delta rotation: deltaQ = currentQ * inverse(initialQ)
+                const currentActiveQuat = activeDomino.group.quaternion.clone();
+                const inverseInitialActive = initialActiveQuaternion.clone().invert();
+                const deltaQuaternion = currentActiveQuat.clone().multiply(inverseInitialActive);
+
+                // Apply delta to all selected dominoes
                 selectedDominoes.forEach(d => {
                     if (d !== activeDomino) {
-                        d.group.quaternion.copy(activeRot);
+                        const initialQuat = initialDominoQuaternions.get(d);
+                        if (initialQuat) {
+                            // newQuat = deltaQ * initialQuat
+                            const newQuat = deltaQuaternion.clone().multiply(initialQuat);
+                            d.group.quaternion.copy(newQuat);
+                        }
                     }
                 });
+
+                // Update arrows to reflect new orientations
+                updateHighlights();
             }
         });
         scene.add(transformControl);
@@ -3846,25 +3901,81 @@
 
         createButton("east", () => {
             if (selectedDominoes.size > 0) {
+                const n = parseInt(document.getElementById('radius-select').value);
                 selectedDominoes.forEach(domino => {
-                    domino.group.position.x += 2;
+                    domino.group.position.x += n;
                 });
-                logAction("Moved X +2");
+                logAction(`Moved X +${n}`);
                 updateGlobalStats();
+                updateHighlights();
             }
             playClickSound();
-        }, '#ff9a9e', '#fecfef', "Move X +2");
+        }, '#ff9a9e', '#fecfef', "Move X +n");
+
+        createButton("west", () => {
+            if (selectedDominoes.size > 0) {
+                const n = parseInt(document.getElementById('radius-select').value);
+                selectedDominoes.forEach(domino => {
+                    domino.group.position.x -= n;
+                });
+                logAction(`Moved X -${n}`);
+                updateGlobalStats();
+                updateHighlights();
+            }
+            playClickSound();
+        }, '#ffd89e', '#fecfaa', "Move X -n");
 
         createButton("north", () => {
             if (selectedDominoes.size > 0) {
+                const n = parseInt(document.getElementById('radius-select').value);
                 selectedDominoes.forEach(domino => {
-                    domino.group.position.z += 2;
+                    domino.group.position.z += n;
                 });
-                logAction("Moved Z +2");
+                logAction(`Moved Z +${n}`);
                 updateGlobalStats();
+                updateHighlights();
             }
             playClickSound();
-        }, '#a1c4fd', '#c2e9fb', "Move Z +2");
+        }, '#a1c4fd', '#c2e9fb', "Move Z +n");
+
+        createButton("south", () => {
+            if (selectedDominoes.size > 0) {
+                const n = parseInt(document.getElementById('radius-select').value);
+                selectedDominoes.forEach(domino => {
+                    domino.group.position.z -= n;
+                });
+                logAction(`Moved Z -${n}`);
+                updateGlobalStats();
+                updateHighlights();
+            }
+            playClickSound();
+        }, '#a1d4fd', '#c2f9fb', "Move Z -n");
+
+        createButton("north_east", () => {
+            if (selectedDominoes.size > 0) {
+                const n = parseInt(document.getElementById('radius-select').value);
+                selectedDominoes.forEach(domino => {
+                    domino.group.position.y += n;
+                });
+                logAction(`Moved Y +${n}`);
+                updateGlobalStats();
+                updateHighlights();
+            }
+            playClickSound();
+        }, '#9aff9e', '#cfffcf', "Move Y +n");
+
+        createButton("south_west", () => {
+            if (selectedDominoes.size > 0) {
+                const n = parseInt(document.getElementById('radius-select').value);
+                selectedDominoes.forEach(domino => {
+                    domino.group.position.y -= n;
+                });
+                logAction(`Moved Y -${n}`);
+                updateGlobalStats();
+                updateHighlights();
+            }
+            playClickSound();
+        }, '#aaffae', '#dfffdf', "Move Y -n");
 
         // Store original background color for Exhibition Mode
         let originalBackgroundColor = null;
@@ -3922,12 +4033,16 @@
                 if (!allChildren.has(d)) {
                     d.isSparking = true;
                     triggeredCount++;
+                    console.log('Triggered spark for root sphere:', d);
                 }
             });
+
+            console.log(`Exhibition Mode: ${triggeredCount} root spheres found, total spheres: ${dominoes.length}`);
 
             // Fallback: If no roots found (e.g. loops), start from the first one
             if (triggeredCount === 0 && dominoes.length > 0) {
                 dominoes[0].isSparking = true;
+                console.log('Exhibition Mode: No roots found, starting from first sphere');
                 logAction("Exhibition Started (Fallback trigger)");
             } else {
                 logAction(`Exhibition Started (${triggeredCount} chains)`);
