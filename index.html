@@ -314,6 +314,26 @@
         .tree-btn:hover {
             background: rgba(255, 255, 255, 0.2);
         }
+
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
     </style>
     <!-- Import map for Three.js -->
     <script type="importmap">
@@ -347,101 +367,45 @@
     <div id="left-panel">
         <div id="button-container">
             <button id="start-btn">Spark Sphere</button>
-            <button id="select-all-btn" title="Select All" style="
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                border-radius: 8px;
-                color: white;
-                cursor: pointer;
-                width: 44px;
-                height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-            ">
-                <span class="material-icons">select_all</span>
-            </button>
-            <button id="select-previous-btn" title="Select Previous" style="
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                border-radius: 8px;
-                color: white;
-                cursor: pointer;
-                width: 44px;
-                height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-                margin-left: 5px;
-            ">
-                <span class="material-icons">restore</span>
-            </button>
-            <button id="select-edges-btn" title="Select Edges (Spheres with no children)" style="
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                border-radius: 8px;
-                color: white;
-                cursor: pointer;
-                width: 44px;
-                height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-                margin-left: 5px;
-            ">
-                <span class="material-icons">mediation</span>
-            </button>
-            <button id="delete-btn" title="Delete Selected and Descendants" style="
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                border-radius: 8px;
-                color: #ff4d4d;
-                cursor: pointer;
-                width: 44px;
-                height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-                margin-left: 5px;
-            ">
-                <span class="material-icons">delete</span>
-            </button>
-            <button id="copy-btn" title="Copy Selected Subtree (Single Selection Only)" style="
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                border-radius: 8px;
-                color: #4a90e2;
-                cursor: pointer;
-                width: 44px;
-                height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-                margin-left: 5px;
-            ">
-                <span class="material-icons">content_copy</span>
-            </button>
-            <button id="paste-btn" title="Paste Copied Subtree" style="
-                background: rgba(255, 255, 255, 0.1);
-                border: none;
-                border-radius: 8px;
-                color: #28a745;
-                cursor: pointer;
-                width: 44px;
-                height: 44px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: background 0.2s;
-                margin-left: 5px;
-            ">
-                <span class="material-icons">content_paste</span>
-            </button>
+            <div style="grid-column: 1 / -1; display: flex; gap: 5px; flex-wrap: wrap;">
+                <button id="tree-view-btn" class="icon-btn" title="Tree View" style="color: #607D8B;">
+                    <span class="material-icons">account_tree</span>
+                </button>
+                <button id="undo-btn" class="icon-btn" title="Undo" style="color: #909090;">
+                    <span class="material-icons">undo</span>
+                </button>
+                <button id="exhibition-btn" class="icon-btn" title="Exhibition Mode" style="color: #9C27B0;">
+                    <span class="material-icons">visibility</span>
+                </button>
+                <button id="orientation-btn" class="icon-btn" title="Orientation Edit" style="color: #E91E63;">
+                    <span class="material-icons">3d_rotation</span>
+                </button>
+                <button id="enlarge-btn" class="icon-btn" title="Enlarge" style="color: #84fab0;">
+                    <span class="material-icons">zoom_in</span>
+                </button>
+            </div>
+            <div style="grid-column: 1 / -1; display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px;">
+                <button id="select-all-btn" class="icon-btn" title="Select All">
+                    <span class="material-icons">select_all</span>
+                </button>
+                <button id="select-previous-btn" class="icon-btn" title="Select Previous">
+                    <span class="material-icons">restore</span>
+                </button>
+                <button id="select-edges-btn" class="icon-btn" title="Select Edges (Spheres with no children)">
+                    <span class="material-icons">mediation</span>
+                </button>
+                <button id="delete-btn" class="icon-btn" title="Delete Selected and Descendants"
+                    style="color: #ff4d4d;">
+                    <span class="material-icons">delete</span>
+                </button>
+                <button id="copy-btn" class="icon-btn" title="Copy Selected Subtree (Single Selection Only)"
+                    style="color: #4a90e2;">
+                    <span class="material-icons">content_copy</span>
+                </button>
+                <button id="paste-btn" class="icon-btn" title="Paste Copied Subtree" style="color: #28a745;">
+                    <span class="material-icons">content_paste</span>
+                </button>
+            </div>
         </div>
 
         <div id="parameters-container">
@@ -449,13 +413,13 @@
 
             <!-- 2. Turn Radius -->
             <div>
-                <label for="radius-select">Add Num / Turn Radius:</label>
+                <label for="radius-select">Add Num / Turn Radius / Move n / N-Way:</label>
                 <select id="radius-select" style="width: 60px;">
                     <!-- Options populated by script -->
                 </select>
                 <script>
                     const radiusSelect = document.getElementById('radius-select');
-                    for (let i = 2; i <= 30; i++) {
+                    for (let i = 1; i <= 30; i++) {
                         const option = document.createElement('option');
                         option.value = i;
                         option.textContent = i;
@@ -489,15 +453,21 @@
                 </select>
             </div>
 
-            <!-- Spiral Mode -->
+            <!-- Turn mirroring / Spiral Orientation -->
             <div>
-                <input type="checkbox" id="spiral-check" style="margin-right: 8px;">
-                <label for="spiral-check" style="cursor: pointer; font-size: 13px;">Archimedean spiral</label>
+                <label for="spiral-direction" style="cursor: pointer; font-size: 13px;">Turn mirroring / Spiral
+                    Orientation</label>
                 <select id="spiral-direction"
                     style="margin-left: 8px; width: 40px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
                     <option value="-">-</option>
                     <option value="+">+</option>
                 </select>
+            </div>
+
+            <!-- Spiral Mode -->
+            <div>
+                <input type="checkbox" id="spiral-check" style="margin-right: 8px;">
+                <label for="spiral-check" style="cursor: pointer; font-size: 13px;">Archimedean spiral</label>
             </div>
 
             <!-- Multi Selection Mode -->
@@ -512,21 +482,6 @@
                 <label for="descendants-check" style="cursor: pointer;">Descendants</label>
             </div>
 
-            <!-- 3. N-Way -->
-            <div>
-                <label for="n-way-select">N-Way:</label>
-                <select id="n-way-select" style="width: 60px;">
-                    <option value="2" selected>2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                    <option value="7">7</option>
-                    <option value="8">8</option>
-                    <option value="9">9</option>
-                    <option value="10">10</option>
-                </select>
-            </div>
 
             <!-- Color and Gradation Group (for mobile left-side layout) -->
             <div id="color-gradation-group">
@@ -1280,7 +1235,7 @@
                     goDown();
                     break;
                 case 'splitNWay':
-                    document.getElementById('n-way-select').value = cmd.n;
+                    document.getElementById('radius-select').value = cmd.n;
                     splitNWay();
                     break;
                 case 'setBranch':
@@ -2497,6 +2452,7 @@
 
                         const targetSpacing = 1.0;
 
+                        const branchItems = [];
                         if (spiralDirection === '+') {
                             const spiralCenter = lastPos.clone();
                             const k = r0 / totalTheta;
@@ -2530,6 +2486,7 @@
 
                                 dominoes.push(newDomino);
                                 createdDominoes.push(newDomino);
+                                branchItems.push(newDomino);
 
                                 currentParent.children.push(newDomino);
                                 newDomino.parent = currentParent;
@@ -2570,11 +2527,35 @@
 
                                 dominoes.push(newDomino);
                                 createdDominoes.push(newDomino);
+                                branchItems.push(newDomino);
 
                                 currentParent.children.push(newDomino);
                                 newDomino.parent = currentParent;
                                 currentParent = newDomino;
                                 spiralStepIndex++;
+                            }
+                        }
+
+                        // Mirroring logic for spiral
+                        if (spiralDirection === '+') {
+                            const firstPos = lastPos;
+                            const lastPos_branch = branchItems[branchItems.length - 1].group.position;
+                            const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
+                            if (chordAxis.lengthSq() > 0.0001) {
+                                const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                                branchItems.forEach(domino => {
+                                    const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
+                                    const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
+                                    const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
+                                    domino.group.position.copy(mirroredPos);
+
+                                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
+                                    const mirroredForward = forward.clone().sub(chordAxis.clone().multiplyScalar(2 * forward.dot(chordAxis))).negate();
+                                    const right = new THREE.Vector3().crossVectors(startUp, mirroredForward).normalize();
+                                    const finalForward = new THREE.Vector3().crossVectors(right, startUp).normalize();
+                                    const matrix = new THREE.Matrix4().makeBasis(right.negate(), startUp, finalForward);
+                                    domino.group.quaternion.setFromRotationMatrix(matrix);
+                                });
                             }
                         }
                     } else {
@@ -2593,6 +2574,7 @@
                         const isUpDown = document.getElementById('updown-mode-check').checked;
                         const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
+                        const branchItems = [];
                         angles.forEach((deg, index) => {
                             const rad = deg * (Math.PI / 180);
 
@@ -2617,11 +2599,35 @@
 
                             dominoes.push(newDomino);
                             createdDominoes.push(newDomino); // Add to created list
+                            branchItems.push(newDomino);
 
                             // Connect graph
                             currentParent.children.push(newDomino);
                             currentParent = newDomino;
                         });
+
+                        // Mirroring logic
+                        if (document.getElementById('spiral-direction').value === '+') {
+                            const firstPos = lastPos;
+                            const lastPos_branch = branchItems[branchItems.length - 1].group.position;
+                            const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
+                            if (chordAxis.lengthSq() > 0.0001) {
+                                const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                                branchItems.forEach(domino => {
+                                    const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
+                                    const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
+                                    const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
+                                    domino.group.position.copy(mirroredPos);
+
+                                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
+                                    const mirroredForward = forward.clone().sub(chordAxis.clone().multiplyScalar(2 * forward.dot(chordAxis))).negate();
+                                    const right = new THREE.Vector3().crossVectors(startUp, mirroredForward).normalize();
+                                    const finalForward = new THREE.Vector3().crossVectors(right, startUp).normalize();
+                                    const matrix = new THREE.Matrix4().makeBasis(right.negate(), startUp, finalForward);
+                                    domino.group.quaternion.setFromRotationMatrix(matrix);
+                                });
+                            }
+                        }
                     }
                     newSelection.add(currentParent);
                 }
@@ -2689,6 +2695,7 @@
 
                         const targetSpacing = 1.0;
 
+                        const branchItems = [];
                         if (spiralDirection === '+') {
                             const spiralCenter = lastPos.clone();
                             const k = r0 / totalTheta;
@@ -2721,6 +2728,7 @@
 
                                 dominoes.push(newDomino);
                                 createdDominoes.push(newDomino);
+                                branchItems.push(newDomino);
 
                                 currentParent.children.push(newDomino);
                                 newDomino.parent = currentParent;
@@ -2760,11 +2768,35 @@
 
                                 dominoes.push(newDomino);
                                 createdDominoes.push(newDomino);
+                                branchItems.push(newDomino);
 
                                 currentParent.children.push(newDomino);
                                 newDomino.parent = currentParent;
                                 currentParent = newDomino;
                                 spiralStepIndex++;
+                            }
+                        }
+
+                        // Mirroring logic for spiral
+                        if (spiralDirection === '+') {
+                            const firstPos = lastPos;
+                            const lastPos_branch = branchItems[branchItems.length - 1].group.position;
+                            const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
+                            if (chordAxis.lengthSq() > 0.0001) {
+                                const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                                branchItems.forEach(domino => {
+                                    const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
+                                    const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
+                                    const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
+                                    domino.group.position.copy(mirroredPos);
+
+                                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
+                                    const mirroredForward = forward.clone().sub(chordAxis.clone().multiplyScalar(2 * forward.dot(chordAxis))).negate();
+                                    const right = new THREE.Vector3().crossVectors(startUp, mirroredForward).normalize();
+                                    const finalForward = new THREE.Vector3().crossVectors(right, startUp).normalize();
+                                    const matrix = new THREE.Matrix4().makeBasis(right.negate(), startUp, finalForward);
+                                    domino.group.quaternion.setFromRotationMatrix(matrix);
+                                });
                             }
                         }
                     } else {
@@ -2779,6 +2811,7 @@
                         const isUpDown = document.getElementById('updown-mode-check').checked;
                         const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
+                        const branchItems = [];
                         angles.forEach((deg, index) => {
                             const rad = deg * (Math.PI / 180);
 
@@ -2800,9 +2833,33 @@
 
                             dominoes.push(newDomino);
                             createdDominoes.push(newDomino);
+                            branchItems.push(newDomino);
                             currentParent.children.push(newDomino);
                             currentParent = newDomino;
                         });
+
+                        // Mirroring logic
+                        if (document.getElementById('spiral-direction').value === '+') {
+                            const firstPos = lastPos;
+                            const lastPos_branch = branchItems[branchItems.length - 1].group.position;
+                            const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
+                            if (chordAxis.lengthSq() > 0.0001) {
+                                const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                                branchItems.forEach(domino => {
+                                    const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
+                                    const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
+                                    const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
+                                    domino.group.position.copy(mirroredPos);
+
+                                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
+                                    const mirroredForward = forward.clone().sub(chordAxis.clone().multiplyScalar(2 * forward.dot(chordAxis))).negate();
+                                    const right = new THREE.Vector3().crossVectors(startUp, mirroredForward).normalize();
+                                    const finalForward = new THREE.Vector3().crossVectors(right, startUp).normalize();
+                                    const matrix = new THREE.Matrix4().makeBasis(right.negate(), startUp, finalForward);
+                                    domino.group.quaternion.setFromRotationMatrix(matrix);
+                                });
+                            }
+                        }
                     }
                     newSelection.add(currentParent);
                 }
@@ -2861,6 +2918,7 @@
             dominoes.forEach((domino, index) => {
                 const mesh = domino.group.children[0];
 
+
                 if (domino.isSparking && !domino.exploded) {
                     // Initialize spark state if not present
                     if (domino.sparkTime === 0) {
@@ -2875,11 +2933,13 @@
                     domino.sparkTime += delta * 2.5; // Controls speed of explosion animation
 
                     const t = domino.sparkTime;
+                    // Get base scale (from Enlarge) or use default (1,1,1)
+                    const baseScale = mesh.userData.baseScale || new THREE.Vector3(1, 1, 1);
 
                     if (t < 0.2) {
-                        // Explosion phase 1: Rapid scale up
-                        const s = (t / 0.2) * 5.0; // Scale up to 5x
-                        mesh.scale.set(s, s, s);
+                        // Explosion phase 1: Rapid scale up (5x of base scale)
+                        const s = (t / 0.2) * 5.0;
+                        mesh.scale.set(baseScale.x * s, baseScale.y * s, baseScale.z * s);
 
                         // Brighten emissive
                         if (mesh.material.emissive) {
@@ -2887,10 +2947,10 @@
                             mesh.material.emissiveIntensity = 2.0;
                         }
                     } else if (t < 0.5) {
-                        // Explosion phase 2: Settle to 1.0
+                        // Explosion phase 2: Settle to base scale
                         const factor = (t - 0.2) / 0.3;
                         const s = 5.0 - factor * 4.0; // 5.0 down to 1.0
-                        mesh.scale.set(s, s, s);
+                        mesh.scale.set(baseScale.x * s, baseScale.y * s, baseScale.z * s);
 
                         // Restore original emissive
                         if (mesh.material.emissive) {
@@ -2902,8 +2962,8 @@
                             mesh.material.emissiveIntensity = 2.0 - factor * 1.0;
                         }
                     } else {
-                        // Done sparking
-                        mesh.scale.set(1, 1, 1);
+                        // Done sparking - use stored base scale
+                        mesh.scale.copy(baseScale);
                         if (mesh.material.emissive) {
                             const baseCol = mesh.userData.baseEmissive || 0x000000;
                             mesh.material.emissive.setHex(baseCol);
@@ -2946,6 +3006,11 @@
                 if (coordDisplay) coordDisplay.textContent = `X: 0.00 Y: 0.00 Z: 0.00 | Depth: -`;
             }
 
+            // Update connection lines if visible
+            if (typeof connectionLinesVisible !== 'undefined' && connectionLinesVisible) {
+                updateConnectionLines();
+            }
+
             renderer.render(scene, camera);
         }
 
@@ -2963,6 +3028,10 @@
                 // HIDE ALL SPHERES FIRST for the sequential appear effect
                 dominoes.forEach(d => {
                     const mesh = d.group.children[0];
+                    // Store current scale as base scale if not already set
+                    if (!mesh.userData.baseScale) {
+                        mesh.userData.baseScale = mesh.scale.clone();
+                    }
                     mesh.visible = false;
                     mesh.scale.set(0, 0, 0);
                     d.isSparking = false;
@@ -3356,13 +3425,14 @@
             treeCtx.restore();
         }
 
-        const treeViewBtn = createButton('account_tree', () => {
+        document.getElementById('tree-view-btn').addEventListener('click', () => {
             treeOverlay.style.display = 'flex';
             treeOffset = { x: 0, y: 0 };
             treeZoom = 1.0;
             renderTree();
-        }, '#4a90e2', '#357abd', 'Tree View');
-        treeViewBtn.id = 'tree-view-btn';
+            logAction("Tree View Opened");
+            playClickSound();
+        });
 
         document.getElementById('close-tree-btn').addEventListener('click', () => {
             treeOverlay.style.display = 'none';
@@ -3573,6 +3643,7 @@
                     const isUpDown = document.getElementById('updown-mode-check').checked;
                     const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
+                    const branchItems = [];
                     // We start from step 1
                     for (let n = 1; n <= steps; n++) {
                         const ratio = n / steps;
@@ -3599,8 +3670,32 @@
 
                         dominoes.push(newDomino);
                         createdDominoes.push(newDomino);
+                        branchItems.push(newDomino);
                         currentParent.children.push(newDomino);
                         currentParent = newDomino;
+                    }
+
+                    // Mirroring logic
+                    if (document.getElementById('spiral-direction').value === '+') {
+                        const firstPos = lastPos;
+                        const lastPos_branch = branchItems[branchItems.length - 1].group.position;
+                        const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
+                        if (chordAxis.lengthSq() > 0.0001) {
+                            const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                            branchItems.forEach(domino => {
+                                const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
+                                const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
+                                const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
+                                domino.group.position.copy(mirroredPos);
+
+                                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
+                                const mirroredForward = forward.clone().sub(chordAxis.clone().multiplyScalar(2 * forward.dot(chordAxis))).negate();
+                                const right = new THREE.Vector3().crossVectors(startUp, mirroredForward).normalize();
+                                const finalForward = new THREE.Vector3().crossVectors(right, startUp).normalize();
+                                const matrix = new THREE.Matrix4().makeBasis(right.negate(), startUp, finalForward);
+                                domino.group.quaternion.setFromRotationMatrix(matrix);
+                            });
+                        }
                     }
                     newSelection.add(currentParent);
                 }
@@ -3662,6 +3757,7 @@
                     const isUpDown = document.getElementById('updown-mode-check').checked;
                     const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
+                    const branchItems = [];
                     // We start from step 1
                     for (let n = 1; n <= steps; n++) {
                         const ratio = n / steps;
@@ -3688,8 +3784,32 @@
 
                         dominoes.push(newDomino);
                         createdDominoes.push(newDomino);
+                        branchItems.push(newDomino);
                         currentParent.children.push(newDomino);
                         currentParent = newDomino;
+                    }
+
+                    // Mirroring logic
+                    if (document.getElementById('spiral-direction').value === '+') {
+                        const firstPos = lastPos;
+                        const lastPos_branch = branchItems[branchItems.length - 1].group.position;
+                        const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
+                        if (chordAxis.lengthSq() > 0.0001) {
+                            const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+                            branchItems.forEach(domino => {
+                                const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
+                                const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
+                                const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
+                                domino.group.position.copy(mirroredPos);
+
+                                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
+                                const mirroredForward = forward.clone().sub(chordAxis.clone().multiplyScalar(2 * forward.dot(chordAxis))).negate();
+                                const right = new THREE.Vector3().crossVectors(startUp, mirroredForward).normalize();
+                                const finalForward = new THREE.Vector3().crossVectors(right, startUp).normalize();
+                                const matrix = new THREE.Matrix4().makeBasis(right.negate(), startUp, finalForward);
+                                domino.group.quaternion.setFromRotationMatrix(matrix);
+                            });
+                        }
                     }
                     newSelection.add(currentParent);
                 }
@@ -3715,7 +3835,7 @@
             if (selectedDominoes.size === 0) return;
             recordSelectionHistory();
 
-            const targetN = parseInt(document.getElementById('n-way-select').value, 10);
+            const targetN = parseInt(document.getElementById('radius-select').value, 10);
             const newSelection = new Set();
             const previousSelection = new Set(selectedDominoes);
             const createdDominoes = [];
@@ -3790,23 +3910,23 @@
                         // Calculate position: Center + Lateral * offset
                         const pos = currentPos.clone().add(lateral.clone().multiplyScalar(offset));
 
-                        const newDomino = createFullyOrientedDomino(pos, lastQuat, color, currentLayer[i < currentLayer.length ? i : i - 1]);
+                        // Parent logic: first N-1 parents have 1 child each, last parent has 2 children.
+                        // Row N has N spheres (currentLayer), Next row has N+1 spheres (index i from 0 to N).
+                        // If i < N-1, parent is currentLayer[i].
+                        // If i >= N-1, parent is currentLayer[N-1] (the last one).
+                        const parentIndex = Math.min(i, currentLayer.length - 1);
+                        const parent = currentLayer[parentIndex];
+
+                        const newDomino = createFullyOrientedDomino(pos, lastQuat, color, parent);
                         newDomino.gradationIndex = currentIndex;
                         newDomino.depth = currentLayer[0].depth + 1;
+
+                        // Ensure child-parent link is established
+                        parent.children.push(newDomino);
 
                         dominoes.push(newDomino);
                         createdDominoes.push(newDomino); // Add to created list
                         nextLayer.push(newDomino);
-
-                        // Connect parents
-                        if (i > 0) {
-                            currentLayer[i - 1].children.push(newDomino);
-                            newDomino.parent = currentLayer[i - 1];
-                        }
-                        if (i < currentLayer.length) {
-                            currentLayer[i].children.push(newDomino);
-                            newDomino.parent = currentLayer[i];
-                        }
                     }
                     currentLayer = nextLayer;
                 }
@@ -3835,6 +3955,11 @@
             playClickSound();
         }, '#4facfe', '#00f2fe', "Add Sphere (Straight)");
 
+        createButton("call_split", () => {
+            splitNWay();
+            playClickSound();
+        }, '#ff9a9e', '#fecfef', "N-Way Split");
+
         createButton("arrow_upward", () => {
             addSpheresDirectional('up');
             playClickSound();
@@ -3855,10 +3980,10 @@
             playClickSound();
         }, '#4facfe', '#00f2fe', "Add Sphere (Right)");
 
-        createButton("undo", () => {
+        document.getElementById('undo-btn').addEventListener('click', () => {
             undoLastAction();
             playClickSound();
-        }, '#dfe9f3', '#909090', "Undo"); // Adjusted color for visibility
+        });
 
         createButton("turn_left", () => {
             turnLeft();
@@ -3880,102 +4005,148 @@
             playClickSound();
         }, '#667eea', '#764ba2', "Go Down");
 
-        createButton("call_split", () => {
-            splitNWay();
-            playClickSound();
-        }, '#ff9a9e', '#fecfef', "N-Way Split");
 
-        createButton("zoom_in", () => {
+        document.getElementById('enlarge-btn').addEventListener('click', () => {
             if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     const mesh = domino.group.children[0];
-                    mesh.scale.x *= 1.19;
-                    mesh.scale.y *= 1.19;
-
-                    mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                    // Scale sphere uniformly in all dimensions (diameter changes)
+                    mesh.scale.x *= 1.2;
+                    mesh.scale.y *= 1.2;
+                    mesh.scale.z *= 1.2;
+                    // Store the new base scale for Spark Sphere animation
+                    mesh.userData.baseScale = mesh.scale.clone();
+                    // No position adjustment needed for spheres (center remains the same)
                 });
                 logAction("Enlarged Scale");
             }
             playClickSound();
-        }, '#84fab0', '#8fd3f4', "Enlarge");
-
-        createButton("east", () => {
-            if (selectedDominoes.size > 0) {
-                const n = parseInt(document.getElementById('radius-select').value);
-                selectedDominoes.forEach(domino => {
-                    domino.group.position.x += n;
-                });
-                logAction(`Moved X +${n}`);
-                updateGlobalStats();
-                updateHighlights();
-            }
-            playClickSound();
-        }, '#ff9a9e', '#fecfef', "Move X +n");
+        });
 
         createButton("west", () => {
             if (selectedDominoes.size > 0) {
                 const n = parseInt(document.getElementById('radius-select').value);
                 selectedDominoes.forEach(domino => {
-                    domino.group.position.x -= n;
+                    // Move Left (Local +X as per user request to flip)
+                    domino.group.translateX(n);
                 });
-                logAction(`Moved X -${n}`);
+                logAction(`Moved Left ${n}`);
                 updateGlobalStats();
                 updateHighlights();
             }
             playClickSound();
-        }, '#ffd89e', '#fecfaa', "Move X -n");
+        }, '#ffd89e', '#fecfaa', "Move Left n");
+
+        createButton("east", () => {
+            if (selectedDominoes.size > 0) {
+                const n = parseInt(document.getElementById('radius-select').value);
+                selectedDominoes.forEach(domino => {
+                    // Move Right (Local -X as per user request to flip)
+                    domino.group.translateX(-n);
+                });
+                logAction(`Moved Right ${n}`);
+                updateGlobalStats();
+                updateHighlights();
+            }
+            playClickSound();
+        }, '#ff9a9e', '#fecfef', "Move Right n");
 
         createButton("north", () => {
             if (selectedDominoes.size > 0) {
                 const n = parseInt(document.getElementById('radius-select').value);
                 selectedDominoes.forEach(domino => {
-                    domino.group.position.z += n;
+                    // Move Forward (Local +Z)
+                    domino.group.translateZ(n);
                 });
-                logAction(`Moved Z +${n}`);
+                logAction(`Moved Forward ${n}`);
                 updateGlobalStats();
                 updateHighlights();
             }
             playClickSound();
-        }, '#a1c4fd', '#c2e9fb', "Move Z +n");
+        }, '#a1c4fd', '#c2e9fb', "Move Forward n");
 
         createButton("south", () => {
             if (selectedDominoes.size > 0) {
                 const n = parseInt(document.getElementById('radius-select').value);
                 selectedDominoes.forEach(domino => {
-                    domino.group.position.z -= n;
+                    // Move Backward (Local -Z)
+                    domino.group.translateZ(-n);
                 });
-                logAction(`Moved Z -${n}`);
+                logAction(`Moved Backward ${n}`);
                 updateGlobalStats();
                 updateHighlights();
             }
             playClickSound();
-        }, '#a1d4fd', '#c2f9fb', "Move Z -n");
+        }, '#a1d4fd', '#c2f9fb', "Move Backward n");
 
         createButton("north_east", () => {
             if (selectedDominoes.size > 0) {
                 const n = parseInt(document.getElementById('radius-select').value);
                 selectedDominoes.forEach(domino => {
-                    domino.group.position.y += n;
+                    // Move Up (Local +Y)
+                    domino.group.translateY(n);
                 });
-                logAction(`Moved Y +${n}`);
+                logAction(`Moved Up ${n}`);
                 updateGlobalStats();
                 updateHighlights();
             }
             playClickSound();
-        }, '#9aff9e', '#cfffcf', "Move Y +n");
+        }, '#9aff9e', '#cfffcf', "Move Up n");
 
         createButton("south_west", () => {
             if (selectedDominoes.size > 0) {
                 const n = parseInt(document.getElementById('radius-select').value);
                 selectedDominoes.forEach(domino => {
-                    domino.group.position.y -= n;
+                    // Move Down (Local -Y)
+                    domino.group.translateY(-n);
                 });
-                logAction(`Moved Y -${n}`);
+                logAction(`Moved Down ${n}`);
                 updateGlobalStats();
                 updateHighlights();
             }
             playClickSound();
-        }, '#aaffae', '#dfffdf', "Move Y -n");
+        }, '#aaffae', '#dfffdf', "Move Down n");
+
+        // --- Connection Lines Feature ---
+        let connectionLinesVisible = false;
+        let connectionLines = [];
+
+        function updateConnectionLines() {
+            // Remove existing lines
+            connectionLines.forEach(line => scene.remove(line));
+            connectionLines = [];
+
+            if (!connectionLinesVisible) return;
+
+            // Create lines for each parent-child relationship
+            const lineMaterial = new THREE.LineBasicMaterial({
+                color: 0x00ffff,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            dominoes.forEach(domino => {
+                if (domino.children && domino.children.length > 0) {
+                    const parentPos = domino.group.position;
+                    domino.children.forEach(child => {
+                        const childPos = child.group.position;
+                        const points = [parentPos.clone(), childPos.clone()];
+                        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                        const line = new THREE.Line(geometry, lineMaterial.clone());
+                        scene.add(line);
+                        connectionLines.push(line);
+                    });
+                }
+            });
+        }
+
+        createButton("account_tree", () => {
+            connectionLinesVisible = !connectionLinesVisible;
+            updateConnectionLines();
+            logAction(connectionLinesVisible ? "Connection Lines: ON" : "Connection Lines: OFF");
+            playClickSound();
+        }, '#00bcd4', '#0097a7', "Toggle Connection Lines");
 
         // Store original background color for Exhibition Mode
         let originalBackgroundColor = null;
@@ -3995,9 +4166,11 @@
             gridHelper.visible = false;
 
             // 3. Hide all UI elements
-            document.getElementById('left-panel').style.display = 'none';
-            document.getElementById('info').style.display = 'none';
-            document.getElementById('button-panel').style.display = 'none';
+            const uiIds = ['left-panel', 'info', 'button-container', 'history-toggle-btn', 'layout-toggle-btn', 'tree-overlay'];
+            uiIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.setProperty('display', 'none', 'important');
+            });
 
             // 4. Clear selection and hide arrows
             selectedDominoes.clear();
@@ -4020,33 +4193,36 @@
                 d.nextGenSparking = false;
             });
 
-            // Find root spheres and start sparking
-            const allChildren = new Set();
-            dominoes.forEach(d => {
-                if (d.children) {
-                    d.children.forEach(c => allChildren.add(c));
+            // Delay sparking by 0.3s
+            setTimeout(() => {
+                // Find root spheres and start sparking
+                const allChildren = new Set();
+                dominoes.forEach(d => {
+                    if (d.children) {
+                        d.children.forEach(c => allChildren.add(c));
+                    }
+                });
+
+                let triggeredCount = 0;
+                dominoes.forEach(d => {
+                    if (!allChildren.has(d)) {
+                        d.isSparking = true;
+                        triggeredCount++;
+                        console.log('Triggered spark for root sphere:', d);
+                    }
+                });
+
+                console.log(`Exhibition Mode: ${triggeredCount} root spheres found, total spheres: ${dominoes.length}`);
+
+                // Fallback: If no roots found (e.g. loops), start from the first one
+                if (triggeredCount === 0 && dominoes.length > 0) {
+                    dominoes[0].isSparking = true;
+                    console.log('Exhibition Mode: No roots found, starting from first sphere');
+                    logAction("Exhibition Started (Fallback trigger)");
+                } else {
+                    logAction(`Exhibition Started (${triggeredCount} chains)`);
                 }
-            });
-
-            let triggeredCount = 0;
-            dominoes.forEach(d => {
-                if (!allChildren.has(d)) {
-                    d.isSparking = true;
-                    triggeredCount++;
-                    console.log('Triggered spark for root sphere:', d);
-                }
-            });
-
-            console.log(`Exhibition Mode: ${triggeredCount} root spheres found, total spheres: ${dominoes.length}`);
-
-            // Fallback: If no roots found (e.g. loops), start from the first one
-            if (triggeredCount === 0 && dominoes.length > 0) {
-                dominoes[0].isSparking = true;
-                console.log('Exhibition Mode: No roots found, starting from first sphere');
-                logAction("Exhibition Started (Fallback trigger)");
-            } else {
-                logAction(`Exhibition Started (${triggeredCount} chains)`);
-            }
+            }, 300);
 
             // 6. Add click handler to return to edit mode
             exhibitionClickHandler = (event) => {
@@ -4079,9 +4255,11 @@
             gridHelper.visible = true;
 
             // 3. Show all UI elements
-            document.getElementById('left-panel').style.display = '';
-            document.getElementById('info').style.display = '';
-            document.getElementById('button-panel').style.display = '';
+            const uiIds = ['left-panel', 'info', 'button-container', 'history-toggle-btn', 'layout-toggle-btn', 'tree-overlay'];
+            uiIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = '';
+            });
 
             // 4. Reset all spheres to visible state
             dominoes.forEach(d => {
@@ -4105,12 +4283,13 @@
         }
 
         // Exhibition Button
-        createButton("visibility", () => {
+        document.getElementById('exhibition-btn').addEventListener('click', () => {
             startExhibition();
-        }, '#9C27B0', '#7B1FA2', 'Exhibition Mode');
+            playClickSound();
+        });
 
         // Orientation Edit Button
-        createButton("3d_rotation", () => {
+        document.getElementById('orientation-btn').addEventListener('click', () => {
             isOrientationEditMode = !isOrientationEditMode;
             if (isOrientationEditMode) {
                 if (activeDomino) {
@@ -4124,7 +4303,8 @@
                 transformControl.detach();
                 logAction("Orientation Edit Mode: OFF");
             }
-        }, '#E91E63', '#C2185B', 'Orientation Edit');
+            playClickSound();
+        });
 
         // Cannon button removed as per user request
 
