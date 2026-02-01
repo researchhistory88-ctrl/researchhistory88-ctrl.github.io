@@ -383,6 +383,10 @@
                 <button id="enlarge-btn" class="icon-btn" title="Enlarge" style="color: #84fab0;">
                     <span class="material-icons">zoom_in</span>
                 </button>
+                <button id="connection-lines-btn" class="icon-btn" title="Toggle Connection Lines"
+                    style="color: #00bcd4;">
+                    <span class="material-icons">account_tree</span>
+                </button>
             </div>
             <div style="grid-column: 1 / -1; display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px;">
                 <button id="select-all-btn" class="icon-btn" title="Select All">
@@ -2925,6 +2929,11 @@
                         mesh.visible = true;
                         mesh.scale.set(0.01, 0.01, 0.01);
 
+                        // Show connection lines from this sphere to its children
+                        if (typeof showConnectionLinesForSphere !== 'undefined' && typeof connectionLinesVisible !== 'undefined' && connectionLinesVisible) {
+                            showConnectionLinesForSphere(domino);
+                        }
+
                         // Play sound on appearance/spark
                         const hue = mesh.userData.hue;
                         playClickSound(hue);
@@ -3007,8 +3016,9 @@
             }
 
             // Update connection lines if visible
-            if (typeof connectionLinesVisible !== 'undefined' && connectionLinesVisible) {
-                updateConnectionLines();
+            // Update connection line positions (lightweight update, no re-creation)
+            if (typeof updateConnectionLinesPositions !== 'undefined') {
+                updateConnectionLinesPositions();
             }
 
             renderer.render(scene, camera);
@@ -3025,6 +3035,12 @@
             const isAnyActive = dominoes.some(d => d.isSparking || d.exploded);
 
             if (dominoes.length > 0 && !isAnyActive) {
+                // Hide selection arrows before sparking
+                orientationArrows.forEach(arrow => scene.remove(arrow));
+                upArrows.forEach(arrow => scene.remove(arrow));
+                orientationArrows = [];
+                upArrows = [];
+
                 // HIDE ALL SPHERES FIRST for the sequential appear effect
                 dominoes.forEach(d => {
                     const mesh = d.group.children[0];
@@ -3038,6 +3054,11 @@
                     d.exploded = false;
                     d.sparkTime = 0;
                 });
+
+                // Hide all connection lines when spark starts
+                if (typeof hideAllConnectionLines !== 'undefined' && connectionLinesVisible) {
+                    hideAllConnectionLines();
+                }
 
                 // Find all root spheres (those not listed as children of any other sphere)
                 const allChildren = new Set();
@@ -3063,8 +3084,10 @@
                     d.sparkTime = 0;
                     d.exploded = false;
                     const mesh = d.group.children[0];
-                    mesh.visible = false;
-                    mesh.scale.set(0, 0, 0);
+                    // Restore visibility and base scale for next Spark
+                    const baseScale = mesh.userData.baseScale || new THREE.Vector3(1, 1, 1);
+                    mesh.visible = true;
+                    mesh.scale.copy(baseScale);
 
                     // Restore original emissive
                     if (mesh.material && mesh.material.emissive) {
@@ -3072,7 +3095,6 @@
                         mesh.material.emissive.setHex(baseCol);
                         mesh.material.emissiveIntensity = 1.0;
                     }
-
                     // Reset transformation if it was falling
                     if (d.animState) {
                         d.group.quaternion.copy(d.animState.initialQuat);
@@ -3082,6 +3104,11 @@
                     d.isFalling = false;
                     d.fallen = false;
                 });
+
+                // Restore connection lines visibility on reset
+                if (typeof showAllConnectionLines !== 'undefined' && connectionLinesVisible) {
+                    showAllConnectionLines();
+                }
 
                 // Exhibition Mode Reset
                 if (isExhibitionMode) {
@@ -4109,11 +4136,14 @@
 
         // --- Connection Lines Feature ---
         let connectionLinesVisible = false;
-        let connectionLines = [];
+        let connectionLines = []; // Stores { line, parent, child } objects
 
         function updateConnectionLines() {
             // Remove existing lines
-            connectionLines.forEach(line => scene.remove(line));
+            connectionLines.forEach(item => {
+                scene.remove(item.line);
+                item.line.geometry.dispose();
+            });
             connectionLines = [];
 
             if (!connectionLinesVisible) return;
@@ -4133,20 +4163,64 @@
                         const childPos = child.group.position;
                         const points = [parentPos.clone(), childPos.clone()];
                         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                        const line = new THREE.Line(geometry, lineMaterial.clone());
+                        const line = new THREE.Line(geometry, lineMaterial);
                         scene.add(line);
-                        connectionLines.push(line);
+                        connectionLines.push({ line, parent: domino, child });
                     });
                 }
             });
         }
 
-        createButton("account_tree", () => {
+        // Hide all connection lines (for Spark Sphere start)
+        function hideAllConnectionLines() {
+            connectionLines.forEach(item => {
+                item.line.visible = false;
+            });
+        }
+
+        // Show all connection lines (for reset)
+        function showAllConnectionLines() {
+            connectionLines.forEach(item => {
+                item.line.visible = true;
+            });
+        }
+
+        // Show connection lines connecting to a specific sphere (from parent to this sphere)
+        function showConnectionLinesForSphere(domino) {
+            connectionLines.forEach(item => {
+                if (item.child === domino) {
+                    item.line.visible = true;
+                }
+            });
+        }
+
+        // Lightweight function to update only line positions (for animation loop)
+        function updateConnectionLinesPositions() {
+            if (!connectionLinesVisible || connectionLines.length === 0) return;
+
+            connectionLines.forEach(item => {
+                const positions = item.line.geometry.attributes.position.array;
+                const parentPos = item.parent.group.position;
+                const childPos = item.child.group.position;
+
+                positions[0] = parentPos.x;
+                positions[1] = parentPos.y;
+                positions[2] = parentPos.z;
+                positions[3] = childPos.x;
+                positions[4] = childPos.y;
+                positions[5] = childPos.z;
+
+                item.line.geometry.attributes.position.needsUpdate = true;
+            });
+        }
+
+        // Toggle Connection Lines button event listener (moved to icon button)
+        document.getElementById('connection-lines-btn').addEventListener('click', () => {
             connectionLinesVisible = !connectionLinesVisible;
             updateConnectionLines();
             logAction(connectionLinesVisible ? "Connection Lines: ON" : "Connection Lines: OFF");
             playClickSound();
-        }, '#00bcd4', '#0097a7', "Toggle Connection Lines");
+        });
 
         // Store original background color for Exhibition Mode
         let originalBackgroundColor = null;
