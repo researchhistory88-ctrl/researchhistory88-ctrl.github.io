@@ -398,6 +398,10 @@
                 <button id="select-edges-btn" class="icon-btn" title="Select Edges (Spheres with no children)">
                     <span class="material-icons">mediation</span>
                 </button>
+                <button id="unselect-random-btn" class="icon-btn" title="Unselect Random (1/n probability)"
+                    style="color: #ff9800;">
+                    <span class="material-icons">shuffle</span>
+                </button>
                 <button id="delete-btn" class="icon-btn" title="Delete Selected and Descendants"
                     style="color: #ff4d4d;">
                     <span class="material-icons">delete</span>
@@ -1118,6 +1122,43 @@
         selectEdgesBtn.addEventListener('mouseout', () => {
             selectEdgesBtn.style.background = 'rgba(255, 255, 255, 0.1)';
             selectEdgesBtn.style.transform = 'scale(1)';
+        });
+
+        // Unselect Random Logic
+        document.getElementById('unselect-random-btn').addEventListener('click', () => {
+            if (selectedDominoes.size > 0) {
+                recordSelectionHistory();
+                const n = parseInt(document.getElementById('radius-select').value) || 2;
+                const probability = 1 - (1 / n);
+                const toRemove = [];
+
+                selectedDominoes.forEach(d => {
+                    if (Math.random() < probability) {
+                        toRemove.push(d);
+                    }
+                });
+
+                toRemove.forEach(d => selectedDominoes.delete(d));
+
+                // Update activeDomino if it was removed
+                if (activeDomino && !selectedDominoes.has(activeDomino)) {
+                    activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
+                }
+
+                updateHighlights();
+                logAction(`Unselect Random (1/${n}): removed ${toRemove.length} spheres`);
+            }
+        });
+
+        // Hover effect for unselect-random button
+        const unselectRandomBtn = document.getElementById('unselect-random-btn');
+        unselectRandomBtn.addEventListener('mouseover', () => {
+            unselectRandomBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+            unselectRandomBtn.style.transform = 'scale(1.1)';
+        });
+        unselectRandomBtn.addEventListener('mouseout', () => {
+            unselectRandomBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            unselectRandomBtn.style.transform = 'scale(1)';
         });
 
         // Hover effect for the delete button
@@ -4266,6 +4307,11 @@
                 d.sparkTime = 0;
                 d.nextGenSparking = false;
             });
+
+            // Hide all connection lines when exhibition spark starts
+            if (typeof hideAllConnectionLines !== 'undefined' && connectionLinesVisible) {
+                hideAllConnectionLines();
+            }
 
             // Delay sparking by 0.3s
             setTimeout(() => {
