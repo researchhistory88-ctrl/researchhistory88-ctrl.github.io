@@ -421,7 +421,7 @@
 
             <!-- 2. Turn Radius -->
             <div>
-                <label for="radius-select">Add Num / Turn Radius / Move n / N-Way:</label>
+                <label for="radius-select">Add Num / Radius / Move N / N-Way / Unselect Ratio:</label>
                 <select id="radius-select" style="width: 60px;">
                     <!-- Options populated by script -->
                 </select>
@@ -4191,7 +4191,7 @@
 
             // Create lines for each parent-child relationship
             const lineMaterial = new THREE.LineBasicMaterial({
-                color: 0x00ffff,
+                color: 0x1edb06,
                 linewidth: 2,
                 transparent: true,
                 opacity: 0.8
@@ -4266,6 +4266,7 @@
         // Store original background color for Exhibition Mode
         let originalBackgroundColor = null;
         let exhibitionClickHandler = null;
+        let introSphere = null; // Brown intro sphere for exhibition
 
         function startExhibition() {
             // Prevent starting if already in exhibition mode
@@ -4291,13 +4292,7 @@
             selectedDominoes.clear();
             updateHighlights();
 
-            // 5. Execute Spark Sphere
-            // Resume Audio Context
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-
-            // Reset and start spark animation
+            // 5. Hide all spheres first
             dominoes.forEach(d => {
                 const mesh = d.group.children[0];
                 mesh.visible = false;
@@ -4308,61 +4303,99 @@
                 d.nextGenSparking = false;
             });
 
-            // Hide all connection lines when exhibition spark starts
+            // Hide all connection lines
             if (typeof hideAllConnectionLines !== 'undefined' && connectionLinesVisible) {
                 hideAllConnectionLines();
             }
 
-            // Delay sparking by 0.3s
-            setTimeout(() => {
-                // Find root spheres and start sparking
-                const allChildren = new Set();
-                dominoes.forEach(d => {
-                    if (d.children) {
-                        d.children.forEach(c => allChildren.add(c));
-                    }
-                });
+            // 6. Create brown intro sphere at origin with radius 1
+            const introGeo = new THREE.SphereGeometry(0.4, 32, 32);
+            const introMat = new THREE.MeshStandardMaterial({
+                color: 0x4a0868, // Purple color
+                roughness: 0.4,
+                metalness: 0.2
+            });
+            introSphere = new THREE.Mesh(introGeo, introMat);
+            introSphere.position.set(0, 0, 0);
+            scene.add(introSphere);
 
-                let triggeredCount = 0;
-                dominoes.forEach(d => {
-                    if (!allChildren.has(d)) {
-                        d.isSparking = true;
-                        triggeredCount++;
-                        console.log('Triggered spark for root sphere:', d);
-                    }
-                });
+            // Resume Audio Context
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
 
-                console.log(`Exhibition Mode: ${triggeredCount} root spheres found, total spheres: ${dominoes.length}`);
-
-                // Fallback: If no roots found (e.g. loops), start from the first one
-                if (triggeredCount === 0 && dominoes.length > 0) {
-                    dominoes[0].isSparking = true;
-                    console.log('Exhibition Mode: No roots found, starting from first sphere');
-                    logAction("Exhibition Started (Fallback trigger)");
-                } else {
-                    logAction(`Exhibition Started (${triggeredCount} chains)`);
-                }
-            }, 300);
-
-            // 6. Add click handler to return to edit mode
+            // 7. Add click handler: first click removes intro sphere and starts spark
             exhibitionClickHandler = (event) => {
                 if (event.target === renderer.domElement) {
-                    exitExhibitionMode();
+                    if (introSphere) {
+                        // First click: remove intro sphere and start spark animation
+                        scene.remove(introSphere);
+                        introSphere.geometry.dispose();
+                        introSphere.material.dispose();
+                        introSphere = null;
+
+                        // Start spark animation
+                        startExhibitionSpark();
+                    } else {
+                        // Subsequent clicks: exit exhibition mode
+                        exitExhibitionMode();
+                    }
                 }
             };
+
             // Delay adding click handler to avoid immediate trigger
             setTimeout(() => {
                 window.addEventListener('click', exhibitionClickHandler);
             }, 500);
         }
 
+        // Separate function to start the spark animation in exhibition mode
+        function startExhibitionSpark() {
+            // Find root spheres and start sparking
+            const allChildren = new Set();
+            dominoes.forEach(d => {
+                if (d.children) {
+                    d.children.forEach(c => allChildren.add(c));
+                }
+            });
+
+            let triggeredCount = 0;
+            dominoes.forEach(d => {
+                if (!allChildren.has(d)) {
+                    d.isSparking = true;
+                    triggeredCount++;
+                    console.log('Triggered spark for root sphere:', d);
+                }
+            });
+
+            console.log(`Exhibition Mode: ${triggeredCount} root spheres found, total spheres: ${dominoes.length}`);
+
+            // Fallback: If no roots found (e.g. loops), start from the first one
+            if (triggeredCount === 0 && dominoes.length > 0) {
+                dominoes[0].isSparking = true;
+                console.log('Exhibition Mode: No roots found, starting from first sphere');
+                logAction("Exhibition Spark Started (Fallback trigger)");
+            } else {
+                logAction(`Exhibition Spark Started (${triggeredCount} chains)`);
+            }
+        }
+
         function exitExhibitionMode() {
             if (!isExhibitionMode) return;
+
 
             // Remove the click handler
             if (exhibitionClickHandler) {
                 window.removeEventListener('click', exhibitionClickHandler);
                 exhibitionClickHandler = null;
+            }
+
+            // Remove intro sphere if it still exists
+            if (introSphere) {
+                scene.remove(introSphere);
+                introSphere.geometry.dispose();
+                introSphere.material.dispose();
+                introSphere = null;
             }
 
             // 1. Restore background color
@@ -4594,7 +4627,8 @@
                     relQuat: relQuat,
                     color: mat.color.getHex(),
                     geometryType: mesh.userData.geometryType || document.getElementById('geometry-select').value,
-                    materialType: document.getElementById('material-select').value // Simplified
+                    materialType: document.getElementById('material-select').value, // Simplified
+                    scale: mesh.userData.baseScale ? mesh.userData.baseScale.clone() : mesh.scale.clone()
                 });
 
                 if (node.children) {
@@ -4630,6 +4664,11 @@
                 const targetMesh = target.group.children[0];
                 const targetMat = Array.isArray(targetMesh.material) ? targetMesh.material[0] : targetMesh.material;
                 targetMat.color.setHex(rootData.color);
+                // Apply scale from copied root to target
+                if (rootData.scale) {
+                    targetMesh.scale.copy(rootData.scale);
+                    targetMesh.userData.baseScale = rootData.scale.clone();
+                }
 
                 // Track newly created spheres to maintain hierarchy during this paste operation
                 const indexToSpheres = new Map();
@@ -4651,6 +4690,13 @@
                     // Create the new sphere
                     const newSphere = createFullyOrientedDomino(newPos, newQuat, data.color, parent);
                     newSphere.depth = parent.depth + 1;
+
+                    // Apply scale from copied data
+                    if (data.scale) {
+                        const newMesh = newSphere.group.children[0];
+                        newMesh.scale.copy(data.scale);
+                        newMesh.userData.baseScale = data.scale.clone();
+                    }
 
                     dominoes.push(newSphere);
                     createdAll.push(newSphere);
