@@ -378,7 +378,10 @@
                     <span class="material-icons">visibility</span>
                 </button>
                 <button id="orientation-btn" class="icon-btn" title="Orientation Edit" style="color: #E91E63;">
-                    <span class="material-icons">3d_rotation</span>
+                    <span class="material-icons">screen_rotation</span>
+                </button>
+                <button id="toggle-surface-btn" class="icon-btn" title="Toggle Surface" style="color: #00BCD4;">
+                    <span class="material-icons">layers</span>
                 </button>
                 <button id="enlarge-btn" class="icon-btn" title="Enlarge" style="color: #84fab0;">
                     <span class="material-icons">zoom_in</span>
@@ -401,6 +404,10 @@
                 <button id="unselect-random-btn" class="icon-btn" title="Unselect Random (1/n probability)"
                     style="color: #ff9800;">
                     <span class="material-icons">shuffle</span>
+                </button>
+                <button id="align-btn" class="icon-btn" title="Align Selected Spheres (Match orientation)"
+                    style="color: #FFEB3B;">
+                    <span class="material-icons">align_horizontal_center</span>
                 </button>
                 <button id="delete-btn" class="icon-btn" title="Delete Selected and Descendants"
                     style="color: #ff4d4d;">
@@ -437,11 +444,7 @@
                 </script>
             </div>
 
-            <script>
-                document.getElementById('branch-select').addEventListener('change', (e) => {
-                    logAction(`Branch Parameter: ${e.target.value}`);
-                });
-            </script>
+
 
             <!-- Branch Parameter -->
             <div>
@@ -460,6 +463,11 @@
                     <option value="36">36</option>
                 </select>
             </div>
+            <script>
+                document.getElementById('branch-select').addEventListener('change', (e) => {
+                    logAction(`Branch Parameter: ${e.target.value}`);
+                });
+            </script>
 
             <!-- Turn mirroring / Spiral Orientation -->
             <div>
@@ -1150,6 +1158,122 @@
             }
         });
 
+        // Align Button logic
+        document.getElementById('align-btn').addEventListener('click', () => {
+            if (selectedDominoes.size === 0) {
+                logAction("Align: No spheres selected");
+                return;
+            }
+
+            let targetQuaternion = null;
+            if (activeDomino && selectedDominoes.has(activeDomino)) {
+                targetQuaternion = activeDomino.group.quaternion.clone();
+            } else {
+                const firstDomino = Array.from(selectedDominoes)[0];
+                targetQuaternion = firstDomino.group.quaternion.clone();
+            }
+
+            selectedDominoes.forEach(d => {
+                d.group.quaternion.copy(targetQuaternion);
+            });
+
+            if (typeof updateSurfaces !== 'undefined') {
+                updateSurfaces();
+            }
+
+            logAction(`Aligned ${selectedDominoes.size} spheres`);
+            playClickSound();
+        });
+
+        // Toggle Surface Logic
+        let surfacesVisible = false;
+        let surfaces = []; // Stores surface meshes
+
+        function updateSurfaces() {
+            // Clear existing surfaces
+            surfaces.forEach(mesh => {
+                scene.remove(mesh);
+                if (mesh.geometry) mesh.geometry.dispose();
+                if (mesh.material) mesh.material.dispose();
+            });
+            surfaces = [];
+
+            if (!surfacesVisible) return;
+
+            const surfaceMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00BCD4,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide
+            });
+
+            // Recursive function to create bridges between two adjacent branches
+            const createBridge = (node1, node2) => {
+                // If both nodes have children, try to bridge them
+                if (node1.children && node1.children.length > 0 &&
+                    node2.children && node2.children.length > 0) {
+
+                    const child1 = node1.children[node1.children.length - 1]; // Last child of left branch
+                    const child2 = node2.children[0]; // First child of right branch
+
+                    const p1 = node1.group.position.clone();
+                    const p2 = node2.group.position.clone();
+                    const p3 = child2.group.position.clone();
+                    const p4 = child1.group.position.clone();
+
+                    // Quad defined by p1(node1), p2(node2), p3(child2), p4(child1)
+                    // T1: p1, p2, p3
+                    // T2: p1, p3, p4
+                    const quadPoints = [
+                        p1.clone(), p2.clone(), p3.clone(),
+                        p1.clone(), p3.clone(), p4.clone()
+                    ];
+
+                    const quadGeometry = new THREE.BufferGeometry().setFromPoints(quadPoints);
+                    quadGeometry.computeVertexNormals();
+
+                    const quadMesh = new THREE.Mesh(quadGeometry, surfaceMaterial.clone());
+                    scene.add(quadMesh);
+                    surfaces.push(quadMesh);
+
+                    // Recurse down
+                    createBridge(child1, child2);
+                }
+            };
+
+            dominoes.forEach(parent => {
+                if (parent.children && parent.children.length >= 2) {
+                    const parentPos = parent.group.position;
+                    // Assuming children array order reflects hierarchy adjacent order
+                    for (let i = 0; i < parent.children.length - 1; i++) {
+                        const child1 = parent.children[i];
+                        const child2 = parent.children[i + 1];
+
+                        const p1 = parentPos.clone();
+                        const p2 = child1.group.position.clone();
+                        const p3 = child2.group.position.clone();
+
+                        // 1. Triangle Surface (Parent -> Child1 -> Child2)
+                        const geometry = new THREE.BufferGeometry().setFromPoints([p1, p2, p3]);
+                        geometry.computeVertexNormals();
+
+                        const mesh = new THREE.Mesh(geometry, surfaceMaterial.clone());
+                        scene.add(mesh);
+                        surfaces.push(mesh);
+
+                        // 2. Recursive Bridge
+                        createBridge(child1, child2);
+                    }
+                }
+            });
+        }
+
+        document.getElementById('toggle-surface-btn').addEventListener('click', () => {
+            surfacesVisible = !surfacesVisible;
+            updateSurfaces();
+            logAction(surfacesVisible ? "Surfaces: ON" : "Surfaces: OFF");
+        });
+
         // Hover effect for unselect-random button
         const unselectRandomBtn = document.getElementById('unselect-random-btn');
         unselectRandomBtn.addEventListener('mouseover', () => {
@@ -1683,6 +1807,10 @@
             }
 
             statsDisplay.textContent = `Max Depth: ${maxDepth} | Spheres: ${dominoes.length} | Leaves: ${leafCount} | Max Width: ${maxWidth}`;
+
+            if (typeof updateSurfaces !== 'undefined') {
+                updateSurfaces();
+            }
         }
 
         // --- Scene Setup ---
@@ -3020,6 +3148,7 @@
                             mesh.material.emissiveIntensity = 1.0;
                         }
                         domino.exploded = true;
+                        domino.isSparking = false;
                     }
 
                     // Trigger children when explosion is well underway
@@ -3040,6 +3169,51 @@
                     domino.nextGenSparking = false;
                 }
             });
+
+            // Exhibition Mode: Check if spark animation is complete
+            if (isExhibitionMode && !exhibitionSurfaceAnimationActive && triggeredExhibitionSpark) {
+                const sparkingCount = dominoes.filter(d => d.isSparking).length;
+                const explodedCount = dominoes.filter(d => d.exploded).length;
+
+                // Detection logic: Start surface animation if no spheres are currently sparking
+                // and at least one has finished (or if time has passed after triggers).
+                // This is more robust than "all exploded" in case some are unreachable.
+                if (sparkingCount === 0 && explodedCount > 0) {
+                    if (surfacesVisible) {
+                        console.log('Exhibition: All active sparks finished, starting surface animation');
+                        startExhibitionSurfaceAnimation();
+                    } else {
+                        console.log('Exhibition: All active sparks finished, surface animation skipped (Toggle Surface is OFF)');
+                        // Even if skipped, we set a temporary flag or just let it be
+                        // Let's set the active flag to true to stop further checks in this session
+                        exhibitionSurfaceAnimationActive = true;
+                    }
+                }
+            }
+
+            // Exhibition Mode: Animate surfaces
+            if (exhibitionSurfaceAnimationActive) {
+                const elapsed = performance.now() - exhibitionSurfaceStartTime;
+                const duration = 2000; // 2 seconds fade-in
+                const targetOpacity = 0.3;
+
+                if (elapsed < duration) {
+                    const progress = elapsed / duration;
+                    const currentOpacity = progress * targetOpacity;
+                    exhibitionSurfaces.forEach(mesh => {
+                        if (mesh.material) {
+                            mesh.material.opacity = currentOpacity;
+                        }
+                    });
+                } else {
+                    // Animation complete, set final opacity
+                    exhibitionSurfaces.forEach(mesh => {
+                        if (mesh.material) {
+                            mesh.material.opacity = targetOpacity;
+                        }
+                    });
+                }
+            }
 
             controls.update();
 
@@ -4267,6 +4441,10 @@
         let originalBackgroundColor = null;
         let exhibitionClickHandler = null;
         let introSphere = null; // Brown intro sphere for exhibition
+        let exhibitionSurfaceAnimationActive = false;
+        let exhibitionSurfaceStartTime = 0;
+        let exhibitionSurfaces = []; // Separate array for exhibition surfaces
+        let triggeredExhibitionSpark = false; // New flag to track if spark has started
 
         function startExhibition() {
             // Prevent starting if already in exhibition mode
@@ -4308,6 +4486,13 @@
                 hideAllConnectionLines();
             }
 
+            // Hide/Remove all surfaces when exhibition starts
+            if (surfacesVisible) {
+                surfaces.forEach(mesh => {
+                    mesh.visible = false;
+                });
+            }
+
             // 6. Create brown intro sphere at origin with radius 1
             const introGeo = new THREE.SphereGeometry(0.4, 32, 32);
             const introMat = new THREE.MeshStandardMaterial({
@@ -4335,6 +4520,7 @@
                         introSphere = null;
 
                         // Start spark animation
+                        triggeredExhibitionSpark = true;
                         startExhibitionSpark();
                     } else {
                         // Subsequent clicks: exit exhibition mode
@@ -4380,6 +4566,84 @@
             }
         }
 
+        // Function to start exhibition surface animation after spark completes
+        function startExhibitionSurfaceAnimation() {
+            exhibitionSurfaceAnimationActive = true;
+            exhibitionSurfaceStartTime = performance.now();
+
+            // Clear any existing exhibition surfaces
+            exhibitionSurfaces.forEach(mesh => {
+                scene.remove(mesh);
+                if (mesh.geometry) mesh.geometry.dispose();
+                if (mesh.material) mesh.material.dispose();
+            });
+            exhibitionSurfaces = [];
+
+            const surfaceMaterial = new THREE.MeshStandardMaterial({
+                color: 0x00BCD4,
+                transparent: true,
+                opacity: 0, // Start invisible
+                side: THREE.DoubleSide
+            });
+
+            // Recursive function to create bridges
+            const createBridge = (node1, node2) => {
+                if (node1.children && node1.children.length > 0 &&
+                    node2.children && node2.children.length > 0) {
+
+                    const child1 = node1.children[node1.children.length - 1];
+                    const child2 = node2.children[0];
+
+                    const p1 = node1.group.position.clone();
+                    const p2 = node2.group.position.clone();
+                    const p3 = child2.group.position.clone();
+                    const p4 = child1.group.position.clone();
+
+                    const quadPoints = [
+                        p1.clone(), p2.clone(), p3.clone(),
+                        p1.clone(), p3.clone(), p4.clone()
+                    ];
+
+                    const quadGeometry = new THREE.BufferGeometry().setFromPoints(quadPoints);
+                    quadGeometry.computeVertexNormals();
+
+                    const quadMesh = new THREE.Mesh(quadGeometry, surfaceMaterial.clone());
+                    scene.add(quadMesh);
+                    exhibitionSurfaces.push(quadMesh);
+
+                    createBridge(child1, child2);
+                }
+            };
+
+            // Generate all surfaces
+            dominoes.forEach(parent => {
+                if (parent.children && parent.children.length >= 2) {
+                    const parentPos = parent.group.position;
+                    for (let i = 0; i < parent.children.length - 1; i++) {
+                        const child1 = parent.children[i];
+                        const child2 = parent.children[i + 1];
+
+                        const p1 = parentPos.clone();
+                        const p2 = child1.group.position.clone();
+                        const p3 = child2.group.position.clone();
+
+                        // Triangle Surface
+                        const geometry = new THREE.BufferGeometry().setFromPoints([p1, p2, p3]);
+                        geometry.computeVertexNormals();
+
+                        const mesh = new THREE.Mesh(geometry, surfaceMaterial.clone());
+                        scene.add(mesh);
+                        exhibitionSurfaces.push(mesh);
+
+                        // Recursive Bridge
+                        createBridge(child1, child2);
+                    }
+                }
+            });
+
+            console.log(`Exhibition Surface Animation: ${exhibitionSurfaces.length} surfaces created`);
+        }
+
         function exitExhibitionMode() {
             if (!isExhibitionMode) return;
 
@@ -4397,6 +4661,17 @@
                 introSphere.material.dispose();
                 introSphere = null;
             }
+
+            // Remove exhibition surfaces
+            exhibitionSurfaces.forEach(mesh => {
+                scene.remove(mesh);
+                if (mesh.geometry) mesh.geometry.dispose();
+                if (mesh.material) mesh.material.dispose();
+            });
+            exhibitionSurfaces = [];
+            exhibitionSurfaceAnimationActive = false;
+            exhibitionSurfaceStartTime = 0;
+            triggeredExhibitionSpark = false;
 
             // 1. Restore background color
             if (originalBackgroundColor) {
@@ -4430,6 +4705,13 @@
                     mesh.material.emissiveIntensity = 1.0;
                 }
             });
+
+            // Restore surfaces visibility
+            if (surfacesVisible) {
+                surfaces.forEach(mesh => {
+                    mesh.visible = true;
+                });
+            }
 
             isExhibitionMode = false;
             logAction("Exhibition Ended - Returned to Edit Mode");
