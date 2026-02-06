@@ -390,6 +390,9 @@
                     style="color: #00bcd4;">
                     <span class="material-icons">account_tree</span>
                 </button>
+                <button id="special-sphere-btn" class="icon-btn" title="Toggle Special Sphere" style="color: #ff5722;">
+                    <span class="material-icons">adjust</span>
+                </button>
             </div>
             <div style="grid-column: 1 / -1; display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px;">
                 <button id="select-all-btn" class="icon-btn" title="Select All">
@@ -1719,6 +1722,75 @@
             emissiveIntensity: 0.2
         });
 
+        // --- Special Sphere ---
+        let specialSphere = null;
+        let specialSphereVisible = false;
+        let specialSphereSelected = false;
+
+        function createSpecialSphere() {
+            const specialSphereGroup = new THREE.Group();
+            const sphereGeo = new THREE.SphereGeometry(0.15, 32, 32);
+            const sphereMat = new THREE.MeshStandardMaterial({
+                color: 0xff0000,
+                roughness: 0.3,
+                metalness: 0.1,
+                emissive: 0xff0000,
+                emissiveIntensity: 0.3
+            });
+            const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+            sphereMesh.castShadow = true;
+            sphereMesh.receiveShadow = true;
+            specialSphereGroup.add(sphereMesh);
+            specialSphereGroup.position.set(10, 10, 10);
+            specialSphereGroup.userData = {
+                isSpecialSphere: true,
+                isDomino: false
+            };
+            return specialSphereGroup;
+        }
+
+        function toggleSpecialSphere() {
+            if (specialSphereVisible) {
+                // Hide special sphere
+                if (specialSphere) {
+                    scene.remove(specialSphere);
+                }
+                specialSphereVisible = false;
+                specialSphereSelected = false;
+                logAction("Special Sphere Hidden");
+            } else {
+                // Show special sphere
+                if (!specialSphere) {
+                    specialSphere = createSpecialSphere();
+                }
+                scene.add(specialSphere);
+                specialSphereVisible = true;
+                logAction("Special Sphere Shown at (10, 10, 10)");
+            }
+            updateSpecialSphereButton();
+        }
+
+        function updateSpecialSphereButton() {
+            const btn = document.getElementById('special-sphere-btn');
+            if (specialSphereVisible) {
+                btn.style.background = 'rgba(255, 87, 34, 0.4)';
+            } else {
+                btn.style.background = 'rgba(255, 255, 255, 0.1)';
+            }
+        }
+
+        function hideSpecialSphereForExhibition() {
+            if (specialSphere && specialSphereVisible) {
+                scene.remove(specialSphere);
+            }
+        }
+
+        function restoreSpecialSphereAfterExhibition() {
+            if (specialSphere && specialSphereVisible) {
+                scene.add(specialSphere);
+            }
+        }
+
         // Undo System
         let undoStack = [];
 
@@ -2384,6 +2456,7 @@
         // Store arrow helpers globally so we can remove them
         let orientationArrows = [];
         let upArrows = [];
+        let specialSphereConnectionLines = [];
 
         // Helper to update highlights
         function updateHighlights() {
@@ -2394,7 +2467,13 @@
                     // Ensure the element is visible
                     coordDisplay.style.display = 'block';
 
-                    if (activeDomino && selectedDominoes.has(activeDomino) && activeDomino.group && activeDomino.group.position) {
+                    if (specialSphereSelected && specialSphere) {
+                        // Force update matrix to ensure world position is current (though position property should be enough)
+                        specialSphere.updateMatrixWorld();
+                        // Show special sphere coordinates
+                        const pos = specialSphere.position;
+                        coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Special Sphere`;
+                    } else if (activeDomino && selectedDominoes.has(activeDomino) && activeDomino.group && activeDomino.group.position) {
                         const pos = activeDomino.group.position;
                         coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Depth: ${activeDomino.depth}`;
                     } else {
@@ -2402,7 +2481,7 @@
                     }
                 }
 
-                // Update Transform Controls
+                // Update Transform Controls (Removed for Special Sphere as requested)
                 if (isOrientationEditMode && activeDomino && selectedDominoes.has(activeDomino)) {
                     transformControl.attach(activeDomino.group);
                 } else {
@@ -2411,11 +2490,13 @@
             } catch (e) {
                 console.error("Error updating coordinates:", e);
             }
-            // Remove existing arrows
+            // Remove existing arrows and connection lines
             orientationArrows.forEach(arrow => scene.remove(arrow));
             upArrows.forEach(arrow => scene.remove(arrow));
+            specialSphereConnectionLines.forEach(line => scene.remove(line));
             orientationArrows = [];
             upArrows = [];
+            specialSphereConnectionLines = [];
 
             dominoes.forEach(d => {
                 const mesh = d.group.children[0];
@@ -2463,6 +2544,71 @@
                     }
                 }
             });
+
+            // Special Sphere arrows (if selected)
+            if (specialSphere && specialSphereVisible && specialSphereSelected) {
+                // Add orientation arrow (forward direction - blue)
+                const forwardDir = new THREE.Vector3(0, 0, 1).applyQuaternion(specialSphere.quaternion).normalize();
+                const orientationArrow = new THREE.ArrowHelper(
+                    forwardDir,
+                    specialSphere.position,
+                    0.8,  // length
+                    0x0088ff,  // blue color
+                    0.2,  // head length
+                    0.1   // head width
+                );
+                scene.add(orientationArrow);
+                orientationArrows.push(orientationArrow);
+
+                // Add up arrow (up direction - green)
+                const upDir = new THREE.Vector3(0, 1, 0).applyQuaternion(specialSphere.quaternion).normalize();
+                const upArrow = new THREE.ArrowHelper(
+                    upDir,
+                    specialSphere.position,
+                    0.5,  // length (shorter than orientation)
+                    0x00ff44,  // green color
+                    0.15,  // head length
+                    0.08   // head width
+                );
+                scene.add(upArrow);
+                upArrows.push(upArrow);
+
+                // Highlight special sphere when selected
+                const mesh = specialSphere.children[0];
+                if (mesh && mesh.material) {
+                    mesh.material.emissiveIntensity = 0.8;
+                }
+            } else if (specialSphere && specialSphere.children[0]) {
+                // Reset emissive when not selected
+                const mesh = specialSphere.children[0];
+                if (mesh && mesh.material) {
+                    mesh.material.emissiveIntensity = 0.3;
+                }
+            }
+
+            // Draw dashed connection lines from selected dominoes to special sphere (if visible)
+            if (specialSphere && specialSphereVisible && selectedDominoes.size > 0) {
+                selectedDominoes.forEach(d => {
+                    const points = [];
+                    points.push(d.group.position.clone());
+                    points.push(specialSphere.position.clone());
+
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const material = new THREE.LineDashedMaterial({
+                        color: 0xffffff,
+                        dashSize: 0.2,
+                        gapSize: 0.1,
+                        linewidth: 1,
+                        opacity: 0.6,
+                        transparent: true
+                    });
+
+                    const line = new THREE.Line(geometry, material);
+                    line.computeLineDistances(); // Required for dashed lines
+                    scene.add(line);
+                    specialSphereConnectionLines.push(line);
+                });
+            }
         }
 
         // Add initial sphere instead of domino
@@ -2492,6 +2638,70 @@
             if (selectedDominoes.size === 0) return;
             recordSelectionHistory();
 
+            // Special mode: If Special Sphere is visible and we're in straight mode, create spheres along connection lines
+            if (direction === 'straight' && specialSphere && specialSphereVisible && selectedDominoes.size > 0) {
+                const previousSelection = new Set(selectedDominoes);
+                const createdDominoes = [];
+                const newSelection = new Set();
+
+                selectedDominoes.forEach(selectedDomino => {
+                    // Calculate distance to Special Sphere
+                    const startPos = selectedDomino.group.position;
+                    const endPos = specialSphere.position;
+                    const distance = startPos.distanceTo(endPos);
+
+                    // Calculate optimal number of segments (closest to 1.0)
+                    const numSegments = Math.max(1, Math.round(distance));
+
+                    // Create spheres at division points
+                    let currentParent = selectedDomino;
+                    const directionVec = new THREE.Vector3().subVectors(endPos, startPos).normalize();
+                    const segmentLength = distance / numSegments;
+
+                    for (let i = 1; i <= numSegments; i++) {
+                        const t = i / numSegments;
+                        const newPos = new THREE.Vector3().lerpVectors(startPos, endPos, t);
+
+                        // Use parent's orientation for new spheres
+                        const lastQuat = currentParent.group.quaternion;
+                        const isGradation = document.getElementById('gradation-check').checked;
+                        let currentIndex = (currentParent.gradationIndex !== undefined) ? currentParent.gradationIndex : 0;
+                        const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+                        currentIndex++;
+                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
+
+                        const newDomino = createFullyOrientedDomino(newPos, lastQuat, color, currentParent);
+                        newDomino.depth = currentParent.depth + 1;
+                        newDomino.gradationIndex = currentIndex;
+
+                        dominoes.push(newDomino);
+                        createdDominoes.push(newDomino);
+
+                        currentParent.children.push(newDomino);
+                        newDomino.parent = currentParent;
+
+                        currentParent = newDomino;
+                    }
+                    newSelection.add(currentParent);
+                });
+
+                selectedDominoes.clear();
+                newSelection.forEach(d => selectedDominoes.add(d));
+
+                if (selectedDominoes.size > 0) {
+                    activeDomino = Array.from(selectedDominoes).pop();
+                } else {
+                    activeDomino = null;
+                }
+
+                updateHighlights();
+                recordUndo('creation', createdDominoes, previousSelection);
+                logAction(`Added Spheres to Special Sphere`);
+                updateGlobalStats();
+                return;
+            }
+
+            // Original behavior for normal mode
             const newSelection = new Set();
             const previousSelection = new Set(selectedDominoes);
             const createdDominoes = [];
@@ -3223,7 +3433,10 @@
             targetCrosshair.position.copy(controls.target);
 
             const coordDisplay = document.getElementById('coord-display');
-            if (activeDomino && selectedDominoes.has(activeDomino) && activeDomino.group && activeDomino.group.position) {
+            if (specialSphereSelected && specialSphere) {
+                const pos = specialSphere.position;
+                if (coordDisplay) coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Special Sphere`;
+            } else if (activeDomino && selectedDominoes.has(activeDomino) && activeDomino.group && activeDomino.group.position) {
                 const pos = activeDomino.group.position;
                 if (coordDisplay) coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Depth: ${activeDomino.depth}`;
             } else {
@@ -4266,8 +4479,12 @@
         });
 
         createButton("west", () => {
-            if (selectedDominoes.size > 0) {
-                const n = parseInt(document.getElementById('radius-select').value);
+            const n = parseInt(document.getElementById('radius-select').value);
+            if (specialSphereSelected && specialSphere) {
+                specialSphere.translateX(n);
+                logAction(`Special Sphere Moved Left ${n}`);
+                updateHighlights();
+            } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     // Move Left (Local +X as per user request to flip)
                     domino.group.translateX(n);
@@ -4280,8 +4497,12 @@
         }, '#ffd89e', '#fecfaa', "Move Left n");
 
         createButton("east", () => {
-            if (selectedDominoes.size > 0) {
-                const n = parseInt(document.getElementById('radius-select').value);
+            const n = parseInt(document.getElementById('radius-select').value);
+            if (specialSphereSelected && specialSphere) {
+                specialSphere.translateX(-n);
+                logAction(`Special Sphere Moved Right ${n}`);
+                updateHighlights();
+            } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     // Move Right (Local -X as per user request to flip)
                     domino.group.translateX(-n);
@@ -4294,8 +4515,12 @@
         }, '#ff9a9e', '#fecfef', "Move Right n");
 
         createButton("north", () => {
-            if (selectedDominoes.size > 0) {
-                const n = parseInt(document.getElementById('radius-select').value);
+            const n = parseInt(document.getElementById('radius-select').value);
+            if (specialSphereSelected && specialSphere) {
+                specialSphere.translateZ(n);
+                logAction(`Special Sphere Moved Forward ${n}`);
+                updateHighlights();
+            } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     // Move Forward (Local +Z)
                     domino.group.translateZ(n);
@@ -4308,8 +4533,12 @@
         }, '#a1c4fd', '#c2e9fb', "Move Forward n");
 
         createButton("south", () => {
-            if (selectedDominoes.size > 0) {
-                const n = parseInt(document.getElementById('radius-select').value);
+            const n = parseInt(document.getElementById('radius-select').value);
+            if (specialSphereSelected && specialSphere) {
+                specialSphere.translateZ(-n);
+                logAction(`Special Sphere Moved Backward ${n}`);
+                updateHighlights();
+            } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     // Move Backward (Local -Z)
                     domino.group.translateZ(-n);
@@ -4322,8 +4551,12 @@
         }, '#a1d4fd', '#c2f9fb', "Move Backward n");
 
         createButton("north_east", () => {
-            if (selectedDominoes.size > 0) {
-                const n = parseInt(document.getElementById('radius-select').value);
+            const n = parseInt(document.getElementById('radius-select').value);
+            if (specialSphereSelected && specialSphere) {
+                specialSphere.translateY(n);
+                logAction(`Special Sphere Moved Up ${n}`);
+                updateHighlights();
+            } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     // Move Up (Local +Y)
                     domino.group.translateY(n);
@@ -4336,8 +4569,12 @@
         }, '#9aff9e', '#cfffcf', "Move Up n");
 
         createButton("south_west", () => {
-            if (selectedDominoes.size > 0) {
-                const n = parseInt(document.getElementById('radius-select').value);
+            const n = parseInt(document.getElementById('radius-select').value);
+            if (specialSphereSelected && specialSphere) {
+                specialSphere.translateY(-n);
+                logAction(`Special Sphere Moved Down ${n}`);
+                updateHighlights();
+            } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
                     // Move Down (Local -Y)
                     domino.group.translateY(-n);
@@ -4458,6 +4695,9 @@
 
             // 2. Hide grid
             gridHelper.visible = false;
+
+            // 2.5. Hide special sphere if visible
+            hideSpecialSphereForExhibition();
 
             // 3. Hide all UI elements
             const uiIds = ['left-panel', 'info', 'button-container', 'history-toggle-btn', 'layout-toggle-btn', 'tree-overlay'];
@@ -4715,11 +4955,20 @@
 
             isExhibitionMode = false;
             logAction("Exhibition Ended - Returned to Edit Mode");
+
+            // Restore special sphere if it was visible
+            restoreSpecialSphereAfterExhibition();
         }
 
         // Exhibition Button
         document.getElementById('exhibition-btn').addEventListener('click', () => {
             startExhibition();
+            playClickSound();
+        });
+
+        // Special Sphere Toggle Button
+        document.getElementById('special-sphere-btn').addEventListener('click', () => {
+            toggleSpecialSphere();
             playClickSound();
         });
 
@@ -4766,6 +5015,23 @@
             const intersects = raycaster.intersectObjects(scene.children, true);
 
             let clickedOnDomino = false;
+
+            // Check if clicked on special sphere first
+            for (let i = 0; i < intersects.length; i++) {
+                let object = intersects[i].object;
+                while (object) {
+                    if (object.userData && object.userData.isSpecialSphere) {
+                        // Clicked on special sphere - select it (no transform controls)
+                        selectedDominoes.clear();
+                        activeDomino = null;
+                        specialSphereSelected = true;
+                        updateHighlights();
+                        logAction("Special Sphere Selected");
+                        return;
+                    }
+                    object = object.parent;
+                }
+            }
 
             for (let i = 0; i < intersects.length; i++) {
                 let object = intersects[i].object;
@@ -4834,6 +5100,7 @@
                     }
 
                     selectedType = 'domino';
+                    specialSphereSelected = false;  // Deselect special sphere when selecting a domino
                     updateHighlights();
                     break;
                 }
@@ -4847,6 +5114,7 @@
                     }
                     selectedDominoes.clear();
                     activeDomino = null;
+                    specialSphereSelected = false;  // Deselect special sphere when clicking background
                     updateHighlights();
                     selectedType = 'background';
                     logAction("Background Selected");
