@@ -4059,118 +4059,124 @@
             renderTree();
         }, { passive: false });
 
-        function goUp() {
-            if (selectedDominoes.size === 0) return;
-            recordSelectionHistory();
+function goUp() {
+    if (selectedDominoes.size === 0) return;
+    recordSelectionHistory();
 
-            const newSelection = new Set();
-            const previousSelection = new Set(selectedDominoes);
-            const createdDominoes = [];
-            const currentSelection = Array.from(selectedDominoes);
-            const radius = parseInt(document.getElementById('radius-select').value, 10);
+    const newSelection = new Set();
+    const previousSelection = new Set(selectedDominoes);
+    const createdDominoes = [];
+    const currentSelection = Array.from(selectedDominoes);
+    const radius = parseInt(document.getElementById('radius-select').value, 10);
 
-            currentSelection.forEach(activeDomino => {
-                const last = activeDomino;
-                const lastPos = last.group.position;
-                const lastQuat = last.group.quaternion;
-                const branchCount = parseInt(document.getElementById('branch-select').value, 10);
-                const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
+    currentSelection.forEach(activeDomino => {
+        const last = activeDomino;
+        const lastPos = last.group.position;
+        const lastQuat = last.group.quaternion;
+        const branchCount = parseInt(document.getElementById('branch-select').value, 10);
+        const localForward = new THREE.Vector3(0, 0, 1).applyQuaternion(lastQuat);
 
-                for (let b = 0; b < branchCount; b++) {
-                    const branchRot = new THREE.Quaternion().setFromAxisAngle(localForward, (b * 2 * Math.PI) / branchCount);
-                    // Local Right is (1, 0, 0) rotated by quaternion and then by branch rotation
-                    const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
-                    const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
+        for (let b = 0; b < branchCount; b++) {
+            const branchRot = new THREE.Quaternion().setFromAxisAngle(localForward, (b * 2 * Math.PI) / branchCount);
+            // Local Right is (1, 0, 0) rotated by quaternion and then by branch rotation
+            const localRight = new THREE.Vector3(1, 0, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
+            const localUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat).applyQuaternion(branchRot);
 
-                    const center = lastPos.clone().add(localUp.clone().multiplyScalar(radius));
-                    const startVec = lastPos.clone().sub(center);
+            const center = lastPos.clone().add(localUp.clone().multiplyScalar(radius));
+            const startVec = lastPos.clone().sub(center);
 
-                    const steps = radius + 1;
-                    const totalAngle = Math.PI / 2;
+            const steps = radius + 1;
+            const totalAngle = Math.PI / 2;
 
-                    let currentParent = last;
+            let currentParent = last;
 
-                    // Gradation Setup
-                    let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
-                    const isGradation = document.getElementById('gradation-check').checked;
-                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+            // Gradation Setup
+            let currentIndex = (last.gradationIndex !== undefined) ? last.gradationIndex : 0;
+            const isGradation = document.getElementById('gradation-check').checked;
+            const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
 
-                    const isUpDown = document.getElementById('updown-mode-check').checked;
-                    const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
+            const isUpDown = document.getElementById('updown-mode-check').checked;
+            const yOffset = parseFloat(document.getElementById('updown-offset').value) || 0;
 
-                    const branchItems = [];
-                    // We start from step 1
-                    for (let n = 1; n <= steps; n++) {
-                        const ratio = n / steps;
-                        const theta = ratio * totalAngle;
+            const branchItems = [];
+            // We start from step 1
+            for (let n = 1; n <= steps; n++) {
+                const ratio = n / steps;
+                const theta = ratio * totalAngle;
 
-                        // Rotate startVec around localRight axis by -theta (Negative for Backward loop/Original behavior)
-                        const newVec = startVec.clone().applyAxisAngle(localRight, -theta);
-                        let newPos = center.clone().add(newVec);
+                // Rotate startVec around localRight axis by -theta (Original behavior)
+                const newVec = startVec.clone().applyAxisAngle(localRight, -theta);
+                let newPos = center.clone().add(newVec);
 
-                        if (isUpDown) {
-                            // Apply vertical offset in local space
-                            newPos.add(localUp.clone().multiplyScalar(yOffset * n));
-                        }
-
-                        // New Rotation: Rotate original quaternion around local right, then incorporate branch rotation
-                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, -theta);
-                        const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat).normalize();
-
-                        currentIndex++;
-                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
-                        newDomino.gradationIndex = currentIndex;
-                        newDomino.depth = currentParent.depth + 1;
-
-                        dominoes.push(newDomino);
-                        createdDominoes.push(newDomino);
-                        branchItems.push(newDomino);
-                        currentParent.children.push(newDomino);
-                        currentParent = newDomino;
-                    }
-
-                    // Mirroring logic
-                    if (document.getElementById('spiral-direction').value === '+') {
-                        const firstPos = lastPos;
-                        const lastPos_branch = branchItems[branchItems.length - 1].group.position;
-                        const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
-                        if (chordAxis.lengthSq() > 0.0001) {
-                            const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
-                            branchItems.forEach(domino => {
-                                const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
-                                const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
-                                const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
-                                domino.group.position.copy(mirroredPos);
-
-                                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
-                                const mirroredForward = forward.clone().sub(chordAxis.clone().multiplyScalar(2 * forward.dot(chordAxis))).negate();
-                                const right = new THREE.Vector3().crossVectors(startUp, mirroredForward).normalize();
-                                const finalForward = new THREE.Vector3().crossVectors(right, startUp).normalize();
-                                const matrix = new THREE.Matrix4().makeBasis(right.negate(), startUp, finalForward);
-                                domino.group.quaternion.setFromRotationMatrix(matrix);
-                            });
-                        }
-                    }
-                    newSelection.add(currentParent);
+                if (isUpDown) {
+                    // Apply vertical offset in local space
+                    newPos.add(localUp.clone().multiplyScalar(yOffset * n));
                 }
-            });
 
-            selectedDominoes.clear();
-            newSelection.forEach(d => selectedDominoes.add(d));
+                // New Rotation: Rotate original quaternion around local right, then incorporate branch rotation
+                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localRight, -theta);
+                const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat).normalize();
 
-            if (selectedDominoes.size > 0) {
-                activeDomino = Array.from(selectedDominoes).pop();
-            } else {
-                activeDomino = null;
+                currentIndex++;
+                const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
+                newDomino.gradationIndex = currentIndex;
+                newDomino.depth = currentParent.depth + 1;
+
+                dominoes.push(newDomino);
+                createdDominoes.push(newDomino);
+                branchItems.push(newDomino);
+                currentParent.children.push(newDomino);
+                currentParent = newDomino;
             }
 
-            updateHighlights();
-            recordUndo('creation', createdDominoes, previousSelection);
-            const branchCountVal = parseInt(document.getElementById('branch-select').value, 10);
-            logAction(`Go Up (Radius: ${radius}${branchCountVal > 1 ? ', Branch: ' + branchCountVal : ''})`);
-            updateGlobalStats();
+            // Mirroring logic - reflect intermediate points about the line from start to end (same logic as goDown)
+            if (document.getElementById('spiral-direction').value === '+' && branchItems.length > 0) {
+                const firstPos = lastPos.clone();
+                const lastPos_branch = branchItems[branchItems.length - 1].group.position.clone();
+                const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
+
+                if (chordAxis.lengthSq() > 0.0001) {
+                    const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
+
+                    branchItems.forEach(domino => {
+                        // Reflect position about the line from firstPos (chordAxis direction)
+                        const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
+                        const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
+                        const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
+                        domino.group.position.copy(mirroredPos);
+
+                        // Mirror orientation logic from goDown
+                        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
+                        // Reflection about chord axis
+                        const mirroredForward = forward.clone().sub(chordAxis.clone().multiplyScalar(2 * forward.dot(chordAxis))).negate();
+
+                        const right = new THREE.Vector3().crossVectors(startUp, mirroredForward).normalize();
+                        const finalForward = new THREE.Vector3().crossVectors(right, startUp).normalize();
+                        const matrix = new THREE.Matrix4().makeBasis(right.negate(), startUp, finalForward);
+                        domino.group.quaternion.setFromRotationMatrix(matrix);
+                    });
+                }
+            }
+            newSelection.add(currentParent);
         }
+    });
+
+    selectedDominoes.clear();
+    newSelection.forEach(d => selectedDominoes.add(d));
+
+    if (selectedDominoes.size > 0) {
+        activeDomino = Array.from(selectedDominoes).pop();
+    } else {
+        activeDomino = null;
+    }
+
+    updateHighlights();
+    recordUndo('creation', createdDominoes, previousSelection);
+    const branchCountVal = parseInt(document.getElementById('branch-select').value, 10);
+    logAction(`Go Up (Radius: ${radius}${branchCountVal > 1 ? ', Branch: ' + branchCountVal : ''})`);
+    updateGlobalStats();
+}
 
         function goDown() {
             if (selectedDominoes.size === 0) return;
