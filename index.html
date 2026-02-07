@@ -397,7 +397,16 @@
                     style="color: #00bcd4;">
                     <span class="material-icons">account_tree</span>
                 </button>
-                <button id="special-sphere-btn" class="icon-btn" title="Toggle Special Sphere" style="color: #ff5722;">
+                <button id="special-sphere-btn" class="icon-btn" title="Toggle Special Sphere (Red)"
+                    style="color: #ff5722;">
+                    <span class="material-icons">adjust</span>
+                </button>
+                <button id="special-sphere-blue-btn" class="icon-btn" title="Toggle Special Sphere (Blue)"
+                    style="color: #2196F3;">
+                    <span class="material-icons">adjust</span>
+                </button>
+                <button id="special-sphere-yellow-btn" class="icon-btn" title="Toggle Special Sphere (Yellow)"
+                    style="color: #FFEB3B;">
                     <span class="material-icons">adjust</span>
                 </button>
             </div>
@@ -1786,9 +1795,125 @@
             }
         }
 
+        // --- Blue Special Sphere ---
+        let specialSphereBlue = null;
+        let specialSphereBlueVisible = false;
+        let specialSphereBlueSelected = false;
+
+        function createSpecialSphereBlue() {
+            const specialSphereGroup = new THREE.Group();
+            const sphereGeo = new THREE.SphereGeometry(0.15, 32, 32);
+            const sphereMat = new THREE.MeshStandardMaterial({
+                color: 0x2196F3,
+                roughness: 0.3,
+                metalness: 0.1,
+                emissive: 0x2196F3,
+                emissiveIntensity: 0.3
+            });
+            const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+            sphereMesh.castShadow = true;
+            sphereMesh.receiveShadow = true;
+            specialSphereGroup.add(sphereMesh);
+            specialSphereGroup.position.set(15, 15, 15);
+            specialSphereGroup.userData = {
+                isSpecialSphere: true,
+                isDomino: false
+            };
+            return specialSphereGroup;
+        }
+
+        function toggleSpecialSphereBlue() {
+            if (specialSphereBlueVisible) {
+                if (specialSphereBlue) {
+                    scene.remove(specialSphereBlue);
+                }
+                specialSphereBlueVisible = false;
+                specialSphereBlueSelected = false;
+                logAction("Blue Special Sphere Hidden");
+            } else {
+                if (!specialSphereBlue) {
+                    specialSphereBlue = createSpecialSphereBlue();
+                }
+                scene.add(specialSphereBlue);
+                specialSphereBlueVisible = true;
+                logAction("Blue Special Sphere Shown at (15, 15, 15)");
+            }
+            updateSpecialSphereBlueButton();
+        }
+
+        function updateSpecialSphereBlueButton() {
+            const btn = document.getElementById('special-sphere-blue-btn');
+            if (specialSphereBlueVisible) {
+                btn.style.background = 'rgba(33, 150, 243, 0.4)';
+            } else {
+                btn.style.background = 'rgba(255, 255, 255, 0.1)';
+            }
+        }
+
+        // --- Yellow Special Sphere ---
+        let specialSphereYellow = null;
+        let specialSphereYellowVisible = false;
+        let specialSphereYellowSelected = false;
+
+        function createSpecialSphereYellow() {
+            const specialSphereGroup = new THREE.Group();
+            const sphereGeo = new THREE.SphereGeometry(0.15, 32, 32);
+            const sphereMat = new THREE.MeshStandardMaterial({
+                color: 0xFFEB3B,
+                roughness: 0.3,
+                metalness: 0.1,
+                emissive: 0xFFEB3B,
+                emissiveIntensity: 0.3
+            });
+            const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+            sphereMesh.castShadow = true;
+            sphereMesh.receiveShadow = true;
+            specialSphereGroup.add(sphereMesh);
+            specialSphereGroup.position.set(20, 20, 20);
+            specialSphereGroup.userData = {
+                isSpecialSphere: true,
+                isDomino: false
+            };
+            return specialSphereGroup;
+        }
+
+        function toggleSpecialSphereYellow() {
+            if (specialSphereYellowVisible) {
+                if (specialSphereYellow) {
+                    scene.remove(specialSphereYellow);
+                }
+                specialSphereYellowVisible = false;
+                specialSphereYellowSelected = false;
+                logAction("Yellow Special Sphere Hidden");
+            } else {
+                if (!specialSphereYellow) {
+                    specialSphereYellow = createSpecialSphereYellow();
+                }
+                scene.add(specialSphereYellow);
+                specialSphereYellowVisible = true;
+                logAction("Yellow Special Sphere Shown at (20, 20, 20)");
+            }
+            updateSpecialSphereYellowButton();
+        }
+
+        function updateSpecialSphereYellowButton() {
+            const btn = document.getElementById('special-sphere-yellow-btn');
+            if (specialSphereYellowVisible) {
+                btn.style.background = 'rgba(255, 235, 59, 0.4)';
+            } else {
+                btn.style.background = 'rgba(255, 255, 255, 0.1)';
+            }
+        }
+
         function hideSpecialSphereForExhibition() {
             if (specialSphere && specialSphereVisible) {
                 scene.remove(specialSphere);
+            }
+            if (specialSphereBlue && specialSphereBlueVisible) {
+                scene.remove(specialSphereBlue);
+            }
+            if (specialSphereYellow && specialSphereYellowVisible) {
+                scene.remove(specialSphereYellow);
             }
         }
 
@@ -1796,7 +1921,14 @@
             if (specialSphere && specialSphereVisible) {
                 scene.add(specialSphere);
             }
+            if (specialSphereBlue && specialSphereBlueVisible) {
+                scene.add(specialSphereBlue);
+            }
+            if (specialSphereYellow && specialSphereYellowVisible) {
+                scene.add(specialSphereYellow);
+            }
         }
+
 
         // Undo System
         let undoStack = [];
@@ -5000,6 +5132,18 @@
         // Special Sphere Toggle Button
         document.getElementById('special-sphere-btn').addEventListener('click', () => {
             toggleSpecialSphere();
+            playClickSound();
+        });
+
+        // Blue Special Sphere Toggle Button
+        document.getElementById('special-sphere-blue-btn').addEventListener('click', () => {
+            toggleSpecialSphereBlue();
+            playClickSound();
+        });
+
+        // Yellow Special Sphere Toggle Button
+        document.getElementById('special-sphere-yellow-btn').addEventListener('click', () => {
+            toggleSpecialSphereYellow();
             playClickSound();
         });
 
