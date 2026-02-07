@@ -2611,13 +2611,22 @@
                         specialSphere.updateMatrixWorld();
                         // Show special sphere coordinates
                         const pos = specialSphere.position;
-                        coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Special Sphere`;
+                        coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Red Special Sphere`;
+                    } else if (specialSphereBlueSelected && specialSphereBlue) {
+                        specialSphereBlue.updateMatrixWorld();
+                        const pos = specialSphereBlue.position;
+                        coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Blue Special Sphere`;
+                    } else if (specialSphereYellowSelected && specialSphereYellow) {
+                        specialSphereYellow.updateMatrixWorld();
+                        const pos = specialSphereYellow.position;
+                        coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Yellow Special Sphere`;
                     } else if (activeDomino && selectedDominoes.has(activeDomino) && activeDomino.group && activeDomino.group.position) {
                         const pos = activeDomino.group.position;
                         coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Depth: ${activeDomino.depth}`;
                     } else {
                         coordDisplay.textContent = `X: - Y: - Z: - | Depth: -`;
                     }
+
                 }
 
                 // Update Transform Controls (Removed for Special Sphere as requested)
@@ -2720,6 +2729,88 @@
             } else if (specialSphere && specialSphere.children[0]) {
                 // Reset emissive when not selected
                 const mesh = specialSphere.children[0];
+                if (mesh && mesh.material) {
+                    mesh.material.emissiveIntensity = 0.3;
+                }
+            }
+
+            // Blue Special Sphere arrows (if selected)
+            if (specialSphereBlue && specialSphereBlueVisible && specialSphereBlueSelected) {
+                // Add orientation arrow (forward direction - blue)
+                const forwardDir = new THREE.Vector3(0, 0, 1).applyQuaternion(specialSphereBlue.quaternion).normalize();
+                const orientationArrow = new THREE.ArrowHelper(
+                    forwardDir,
+                    specialSphereBlue.position,
+                    0.8,  // length
+                    0x0088ff,  // blue color
+                    0.2,  // head length
+                    0.1   // head width
+                );
+                scene.add(orientationArrow);
+                orientationArrows.push(orientationArrow);
+
+                // Add up arrow (up direction - green)
+                const upDir = new THREE.Vector3(0, 1, 0).applyQuaternion(specialSphereBlue.quaternion).normalize();
+                const upArrow = new THREE.ArrowHelper(
+                    upDir,
+                    specialSphereBlue.position,
+                    0.5,  // length (shorter than orientation)
+                    0x00ff44,  // green color
+                    0.15,  // head length
+                    0.08   // head width
+                );
+                scene.add(upArrow);
+                upArrows.push(upArrow);
+
+                // Highlight blue special sphere when selected
+                const mesh = specialSphereBlue.children[0];
+                if (mesh && mesh.material) {
+                    mesh.material.emissiveIntensity = 0.8;
+                }
+            } else if (specialSphereBlue && specialSphereBlue.children[0]) {
+                // Reset emissive when not selected
+                const mesh = specialSphereBlue.children[0];
+                if (mesh && mesh.material) {
+                    mesh.material.emissiveIntensity = 0.3;
+                }
+            }
+
+            // Yellow Special Sphere arrows (if selected)
+            if (specialSphereYellow && specialSphereYellowVisible && specialSphereYellowSelected) {
+                // Add orientation arrow (forward direction - blue)
+                const forwardDir = new THREE.Vector3(0, 0, 1).applyQuaternion(specialSphereYellow.quaternion).normalize();
+                const orientationArrow = new THREE.ArrowHelper(
+                    forwardDir,
+                    specialSphereYellow.position,
+                    0.8,  // length
+                    0x0088ff,  // blue color
+                    0.2,  // head length
+                    0.1   // head width
+                );
+                scene.add(orientationArrow);
+                orientationArrows.push(orientationArrow);
+
+                // Add up arrow (up direction - green)
+                const upDir = new THREE.Vector3(0, 1, 0).applyQuaternion(specialSphereYellow.quaternion).normalize();
+                const upArrow = new THREE.ArrowHelper(
+                    upDir,
+                    specialSphereYellow.position,
+                    0.5,  // length (shorter than orientation)
+                    0x00ff44,  // green color
+                    0.15,  // head length
+                    0.08   // head width
+                );
+                scene.add(upArrow);
+                upArrows.push(upArrow);
+
+                // Highlight yellow special sphere when selected
+                const mesh = specialSphereYellow.children[0];
+                if (mesh && mesh.material) {
+                    mesh.material.emissiveIntensity = 0.8;
+                }
+            } else if (specialSphereYellow && specialSphereYellow.children[0]) {
+                // Reset emissive when not selected
+                const mesh = specialSphereYellow.children[0];
                 if (mesh && mesh.material) {
                     mesh.material.emissiveIntensity = 0.3;
                 }
