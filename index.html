@@ -1757,7 +1757,7 @@
             sphereMesh.castShadow = true;
             sphereMesh.receiveShadow = true;
             specialSphereGroup.add(sphereMesh);
-            specialSphereGroup.position.set(10, 10, 10);
+            specialSphereGroup.position.set(12, 12, 12);
             specialSphereGroup.userData = {
                 isSpecialSphere: true,
                 isDomino: false
@@ -1781,7 +1781,7 @@
                 }
                 scene.add(specialSphere);
                 specialSphereVisible = true;
-                logAction("Special Sphere Shown at (10, 10, 10)");
+                logAction("Special Sphere Shown at (12, 12, 12)");
             }
             updateSpecialSphereButton();
         }
@@ -1814,7 +1814,7 @@
             sphereMesh.castShadow = true;
             sphereMesh.receiveShadow = true;
             specialSphereGroup.add(sphereMesh);
-            specialSphereGroup.position.set(15, 15, 15);
+            specialSphereGroup.position.set(8, 8, 8);
             specialSphereGroup.userData = {
                 isSpecialSphere: true,
                 isDomino: false
@@ -1836,7 +1836,7 @@
                 }
                 scene.add(specialSphereBlue);
                 specialSphereBlueVisible = true;
-                logAction("Blue Special Sphere Shown at (15, 15, 15)");
+                logAction("Blue Special Sphere Shown at (8, 8, 8)");
             }
             updateSpecialSphereBlueButton();
         }
@@ -1869,7 +1869,7 @@
             sphereMesh.castShadow = true;
             sphereMesh.receiveShadow = true;
             specialSphereGroup.add(sphereMesh);
-            specialSphereGroup.position.set(20, 20, 20);
+            specialSphereGroup.position.set(4, 4, 4);
             specialSphereGroup.userData = {
                 isSpecialSphere: true,
                 isDomino: false
@@ -1891,7 +1891,7 @@
                 }
                 scene.add(specialSphereYellow);
                 specialSphereYellowVisible = true;
-                logAction("Yellow Special Sphere Shown at (20, 20, 20)");
+                logAction("Yellow Special Sphere Shown at (4, 4, 4)");
             }
             updateSpecialSphereYellowButton();
         }
@@ -5196,17 +5196,34 @@
                 let object = intersects[i].object;
                 while (object) {
                     if (object.userData && object.userData.isSpecialSphere) {
-                        // Clicked on special sphere - select it (no transform controls)
+                        // Clicked on special sphere - determine which one
                         selectedDominoes.clear();
                         activeDomino = null;
-                        specialSphereSelected = true;
+
+                        // Reset all special sphere selections
+                        specialSphereSelected = false;
+                        specialSphereBlueSelected = false;
+                        specialSphereYellowSelected = false;
+
+                        // Check which special sphere was clicked
+                        if (specialSphere && (object === specialSphere || object.parent === specialSphere)) {
+                            specialSphereSelected = true;
+                            logAction("Red Special Sphere Selected");
+                        } else if (specialSphereBlue && (object === specialSphereBlue || object.parent === specialSphereBlue)) {
+                            specialSphereBlueSelected = true;
+                            logAction("Blue Special Sphere Selected");
+                        } else if (specialSphereYellow && (object === specialSphereYellow || object.parent === specialSphereYellow)) {
+                            specialSphereYellowSelected = true;
+                            logAction("Yellow Special Sphere Selected");
+                        }
+
                         updateHighlights();
-                        logAction("Special Sphere Selected");
                         return;
                     }
                     object = object.parent;
                 }
             }
+
 
             for (let i = 0; i < intersects.length; i++) {
                 let object = intersects[i].object;
