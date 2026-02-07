@@ -4734,7 +4734,15 @@
             const n = parseInt(document.getElementById('radius-select').value);
             if (specialSphereSelected && specialSphere) {
                 specialSphere.translateX(n);
-                logAction(`Special Sphere Moved Left ${n}`);
+                logAction(`Red Special Sphere Moved Left ${n}`);
+                updateHighlights();
+            } else if (specialSphereBlueSelected && specialSphereBlue) {
+                specialSphereBlue.translateX(n);
+                logAction(`Blue Special Sphere Moved Left ${n}`);
+                updateHighlights();
+            } else if (specialSphereYellowSelected && specialSphereYellow) {
+                specialSphereYellow.translateX(n);
+                logAction(`Yellow Special Sphere Moved Left ${n}`);
                 updateHighlights();
             } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
@@ -4752,7 +4760,15 @@
             const n = parseInt(document.getElementById('radius-select').value);
             if (specialSphereSelected && specialSphere) {
                 specialSphere.translateX(-n);
-                logAction(`Special Sphere Moved Right ${n}`);
+                logAction(`Red Special Sphere Moved Right ${n}`);
+                updateHighlights();
+            } else if (specialSphereBlueSelected && specialSphereBlue) {
+                specialSphereBlue.translateX(-n);
+                logAction(`Blue Special Sphere Moved Right ${n}`);
+                updateHighlights();
+            } else if (specialSphereYellowSelected && specialSphereYellow) {
+                specialSphereYellow.translateX(-n);
+                logAction(`Yellow Special Sphere Moved Right ${n}`);
                 updateHighlights();
             } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
@@ -4770,7 +4786,15 @@
             const n = parseInt(document.getElementById('radius-select').value);
             if (specialSphereSelected && specialSphere) {
                 specialSphere.translateZ(n);
-                logAction(`Special Sphere Moved Forward ${n}`);
+                logAction(`Red Special Sphere Moved Forward ${n}`);
+                updateHighlights();
+            } else if (specialSphereBlueSelected && specialSphereBlue) {
+                specialSphereBlue.translateZ(n);
+                logAction(`Blue Special Sphere Moved Forward ${n}`);
+                updateHighlights();
+            } else if (specialSphereYellowSelected && specialSphereYellow) {
+                specialSphereYellow.translateZ(n);
+                logAction(`Yellow Special Sphere Moved Forward ${n}`);
                 updateHighlights();
             } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
@@ -4788,7 +4812,15 @@
             const n = parseInt(document.getElementById('radius-select').value);
             if (specialSphereSelected && specialSphere) {
                 specialSphere.translateZ(-n);
-                logAction(`Special Sphere Moved Backward ${n}`);
+                logAction(`Red Special Sphere Moved Backward ${n}`);
+                updateHighlights();
+            } else if (specialSphereBlueSelected && specialSphereBlue) {
+                specialSphereBlue.translateZ(-n);
+                logAction(`Blue Special Sphere Moved Backward ${n}`);
+                updateHighlights();
+            } else if (specialSphereYellowSelected && specialSphereYellow) {
+                specialSphereYellow.translateZ(-n);
+                logAction(`Yellow Special Sphere Moved Backward ${n}`);
                 updateHighlights();
             } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
@@ -4806,7 +4838,15 @@
             const n = parseInt(document.getElementById('radius-select').value);
             if (specialSphereSelected && specialSphere) {
                 specialSphere.translateY(n);
-                logAction(`Special Sphere Moved Up ${n}`);
+                logAction(`Red Special Sphere Moved Up ${n}`);
+                updateHighlights();
+            } else if (specialSphereBlueSelected && specialSphereBlue) {
+                specialSphereBlue.translateY(n);
+                logAction(`Blue Special Sphere Moved Up ${n}`);
+                updateHighlights();
+            } else if (specialSphereYellowSelected && specialSphereYellow) {
+                specialSphereYellow.translateY(n);
+                logAction(`Yellow Special Sphere Moved Up ${n}`);
                 updateHighlights();
             } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
@@ -4824,7 +4864,15 @@
             const n = parseInt(document.getElementById('radius-select').value);
             if (specialSphereSelected && specialSphere) {
                 specialSphere.translateY(-n);
-                logAction(`Special Sphere Moved Down ${n}`);
+                logAction(`Red Special Sphere Moved Down ${n}`);
+                updateHighlights();
+            } else if (specialSphereBlueSelected && specialSphereBlue) {
+                specialSphereBlue.translateY(-n);
+                logAction(`Blue Special Sphere Moved Down ${n}`);
+                updateHighlights();
+            } else if (specialSphereYellowSelected && specialSphereYellow) {
+                specialSphereYellow.translateY(-n);
+                logAction(`Yellow Special Sphere Moved Down ${n}`);
                 updateHighlights();
             } else if (selectedDominoes.size > 0) {
                 selectedDominoes.forEach(domino => {
