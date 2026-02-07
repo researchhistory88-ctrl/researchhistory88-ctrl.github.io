@@ -4958,7 +4958,9 @@
                 d.exploded = false;
                 const mesh = d.group.children[0];
                 mesh.visible = true;
-                mesh.scale.set(1, 1, 1);
+                // Restore base scale (from Enlarge) if available, otherwise use default (1,1,1)
+                const baseScale = mesh.userData.baseScale || new THREE.Vector3(1, 1, 1);
+                mesh.scale.copy(baseScale);
 
                 // Restore emissive
                 if (mesh.material && mesh.material.emissive) {
