@@ -5244,6 +5244,7 @@
                 if (activeDomino) {
                     transformControl.attach(activeDomino.group);
                     transformControl.setMode('rotate');
+                    transformControl.setSpace('local'); // Align gizmo with object's local orientation
                     logAction("Orientation Edit Mode: ON");
                 } else {
                     logAction("Orientation Edit Mode: ON (Select a sphere)");
