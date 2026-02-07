@@ -2108,18 +2108,21 @@
                 const zDeg = THREE.MathUtils.radToDeg(euler.z).toFixed(0);
                 rotationDisplay.textContent = `X: ${xDeg}° Y: ${yDeg}° Z: ${zDeg}°`;
 
-                // Calculate delta rotation: deltaQ = currentQ * inverse(initialQ)
+                // Calculate LOCAL rotation delta: how much the active sphere rotated in its local space
+                // localDeltaQ = inverse(initialQ) * currentQ (rotation from initial to current in local space)
                 const currentActiveQuat = activeDomino.group.quaternion.clone();
                 const inverseInitialActive = initialActiveQuaternion.clone().invert();
-                const deltaQuaternion = currentActiveQuat.clone().multiply(inverseInitialActive);
+                const localDeltaQuaternion = inverseInitialActive.clone().multiply(currentActiveQuat);
 
-                // Apply delta to all selected dominoes
+                // Apply the same LOCAL rotation to all selected spheres
+                // Each sphere gets rotated by the same amount in its own local coordinate system
                 selectedDominoes.forEach(d => {
                     if (d !== activeDomino) {
                         const initialQuat = initialDominoQuaternions.get(d);
                         if (initialQuat) {
-                            // newQuat = deltaQ * initialQuat
-                            const newQuat = deltaQuaternion.clone().multiply(initialQuat);
+                            // newQuat = initialQuat * localDeltaQuat
+                            // This applies the local rotation delta to each sphere's own local axes
+                            const newQuat = initialQuat.clone().multiply(localDeltaQuaternion);
                             d.group.quaternion.copy(newQuat);
                         }
                     }
