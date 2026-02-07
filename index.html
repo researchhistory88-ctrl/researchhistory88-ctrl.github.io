@@ -2286,9 +2286,6 @@
                 shape.moveTo(x, y + h);
                 shape.bezierCurveTo(x + w, y + h, x + 2.0 * s, y - 1.0 * s, x, y - h);
                 shape.bezierCurveTo(x - 2.0 * s, y - 1.0 * s, x - w, y + h, x, y + h);
-
-                // Center the petal vertically roughly
-                // The above drawing is centered around (0,0) but slightly offset
             } else {
                 // Standard or Rounded
                 const radius = type === 'rounded' ? 0.5 : 0.1;
@@ -2310,99 +2307,12 @@
                 shape.lineTo(-w, -h);
             }
 
-            const extrudeSettings = {
-                depth: depth,
-                bevelEnabled: false,
-                curveSegments: 24 // Increased for smoother curves
-            };
+            // Create flat ShapeGeometry (no thickness)
+            const geometry = new THREE.ShapeGeometry(shape, 24);
 
-            const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-            //geometry.center();
-
-            // Re-group faces for materials
-            // Material 0: Body
-            // Material 1: Top (Black)
-
-            const nonIndexedGeo = geometry.toNonIndexed();
-            const posAttribute = nonIndexedGeo.attributes.position;
-            const normalAttribute = nonIndexedGeo.attributes.normal;
-            const uvAttribute = nonIndexedGeo.attributes.uv;
-
-            const bodyVerts = [];
-            const bodyNormals = [];
-            const bodyUVs = [];
-
-            const topVerts = [];
-            const topNormals = [];
-            const topUVs = [];
-
-            const vertexCount = posAttribute.count;
-
-            for (let i = 0; i < vertexCount; i += 3) {
-                // Check normal Y component
-                const ny = normalAttribute.getY(i);
-
-                // For flat shapes like circle/diamond, the top face normal is exactly (0, 0, 1) in local ExtrudeGeometry space before rotation?
-                // Wait, ExtrudeGeometry extrudes along Z by default.
-                // geometry.center() centers it.
-                // We want the face that corresponds to the "front" or "back" of the extrusion to be the "Top" face in our domino context?
-                // In the previous code, we checked normal Y?
-                // Ah, looking at previous code:
-                // shape.moveTo(-w, -h)...
-                // This draws in XY.
-                // ExtrudeGeometry extrudes along Z.
-                // So the large faces are normal +Z and -Z.
-                // The side faces have normals in XY plane (so Z=0).
-                // Why did the previous code check `ny > 0.9`?
-                // Maybe the geometry was rotated?
-                // "dominoGroup.rotation.order = 'YXZ';"
-                // "dominoMesh.position.set(0, DOMINO_HEIGHT / 2, -DOMINO_DEPTH / 2);"
-                // If I look at the previous code again...
-                // It seems I might have misread or the previous logic relied on something specific.
-                // Let's look at `createDominoGeometry` in previous turn.
-                // It was checking `ny > 0.9`.
-                // If the shape is in XY, and extruded in Z, the top edge (y=+h) has normal (0, 1, 0).
-                // So `ny > 0.9` selects the TOP EDGE face.
-                // The "Top" material (Black) is the one on the "Top" of the domino (highest Y).
-                // Yes, that makes sense. The "Face" of the domino (with dots) is usually the large flat side, but here we are coloring the "Top" (ceiling) of the domino black?
-                // Or is "Top" meaning the face with dots?
-                // "Material 1: Top (Black)"
-                // Dominos usually have black/white dots on the large face.
-                // But the code selects `ny > 0.9`. That is the surface facing UP (+Y).
-                // So it's the "cap" of the domino.
-                // Okay, I will preserve that logic.
-
-                if (ny > 0.9) {
-                    // Top Face (facing +Y)
-                    for (let j = 0; j < 3; j++) {
-                        topVerts.push(posAttribute.getX(i + j), posAttribute.getY(i + j), posAttribute.getZ(i + j));
-                        topNormals.push(normalAttribute.getX(i + j), normalAttribute.getY(i + j), normalAttribute.getZ(i + j));
-                        topUVs.push(uvAttribute.getX(i + j), uvAttribute.getY(i + j));
-                    }
-                } else {
-                    // Body Face
-                    for (let j = 0; j < 3; j++) {
-                        bodyVerts.push(posAttribute.getX(i + j), posAttribute.getY(i + j), posAttribute.getZ(i + j));
-                        bodyNormals.push(normalAttribute.getX(i + j), normalAttribute.getY(i + j), normalAttribute.getZ(i + j));
-                        bodyUVs.push(uvAttribute.getX(i + j), uvAttribute.getY(i + j));
-                    }
-                }
-            }
-
-            const newPos = new Float32Array([...bodyVerts, ...topVerts]);
-            const newNorm = new Float32Array([...bodyNormals, ...topNormals]);
-            const newUV = new Float32Array([...bodyUVs, ...topUVs]);
-
-            nonIndexedGeo.setAttribute('position', new THREE.BufferAttribute(newPos, 3));
-            nonIndexedGeo.setAttribute('normal', new THREE.BufferAttribute(newNorm, 3));
-            nonIndexedGeo.setAttribute('uv', new THREE.BufferAttribute(newUV, 2));
-
-            nonIndexedGeo.clearGroups();
-            nonIndexedGeo.addGroup(0, bodyVerts.length / 3, 0); // Material 0: Body
-            nonIndexedGeo.addGroup(bodyVerts.length / 3, topVerts.length / 3, 1); // Material 1: Top
-
-            return nonIndexedGeo;
+            return geometry;
         }
+
 
 
 
@@ -2436,7 +2346,8 @@
             if (isRainbowMode) {
                 bodyMaterial = new THREE.MeshStandardMaterial({
                     metalness: 1.0,
-                    roughness: 0.5
+                    roughness: 0.5,
+                    side: THREE.DoubleSide
                 });
                 const hue = (dominoes.length * 0.05) % 1.0;
                 bodyMaterial.color.setHSL(hue, 1.0, 0.5);
@@ -2445,7 +2356,8 @@
                 bodyMaterial = new THREE.MeshStandardMaterial({
                     color: colorVal,
                     roughness: 0.3,
-                    metalness: 0.1
+                    metalness: 0.1,
+                    side: THREE.DoubleSide
                 });
             }
 
@@ -2520,7 +2432,8 @@
             if (isRainbowMode) {
                 bodyMaterial = new THREE.MeshStandardMaterial({
                     metalness: 1.0,
-                    roughness: 0.5
+                    roughness: 0.5,
+                    side: THREE.DoubleSide
                 });
                 const hue = (dominoes.length * 0.05) % 1.0;
                 bodyMaterial.color.setHSL(hue, 1.0, 0.5);
@@ -2529,7 +2442,8 @@
                 bodyMaterial = new THREE.MeshStandardMaterial({
                     color: colorVal,
                     roughness: 0.3,
-                    metalness: 0.1
+                    metalness: 0.1,
+                    side: THREE.DoubleSide
                 });
             }
 
