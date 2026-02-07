@@ -2819,11 +2819,27 @@
             // Draw dashed connection lines from selected dominoes to special sphere (if visible)
             if (specialSphere && specialSphereVisible && selectedDominoes.size > 0) {
                 selectedDominoes.forEach(d => {
-                    const points = [];
-                    points.push(d.group.position.clone());
-                    points.push(specialSphere.position.clone());
+                    let geometry;
 
-                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    // If both red and blue special spheres are visible, draw quadratic Bezier curve
+                    if (specialSphereBlue && specialSphereBlueVisible) {
+                        // Create quadratic Bezier curve
+                        // Start: selected sphere, Control: blue sphere, End: red sphere
+                        const curve = new THREE.QuadraticBezierCurve3(
+                            d.group.position.clone(),           // Start point
+                            specialSphereBlue.position.clone(), // Control point (blue)
+                            specialSphere.position.clone()      // End point (red)
+                        );
+                        const points = curve.getPoints(50); // 50 segments for smooth curve
+                        geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    } else {
+                        // Draw straight line if only red sphere is visible
+                        const points = [];
+                        points.push(d.group.position.clone());
+                        points.push(specialSphere.position.clone());
+                        geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    }
+
                     const material = new THREE.LineDashedMaterial({
                         color: 0xffffff,
                         dashSize: 0.2,
@@ -2839,6 +2855,7 @@
                     specialSphereConnectionLines.push(line);
                 });
             }
+
         }
 
         // Add initial sphere instead of domino
