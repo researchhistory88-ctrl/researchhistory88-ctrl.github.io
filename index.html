@@ -2891,23 +2891,44 @@
                 const createdDominoes = [];
                 const newSelection = new Set();
 
-                selectedDominoes.forEach(selectedDomino => {
-                    // Calculate distance to Special Sphere
-                    const startPos = selectedDomino.group.position;
-                    const endPos = specialSphere.position;
-                    const distance = startPos.distanceTo(endPos);
+                // Check if blue sphere is visible for Bezier curve mode
+                const useBezierCurve = specialSphereBlue && specialSphereBlueVisible;
 
-                    // Calculate optimal number of segments (closest to 1.0)
-                    const numSegments = Math.max(1, Math.round(distance));
+                selectedDominoes.forEach(selectedDomino => {
+                    const startPos = selectedDomino.group.position.clone();
+                    const endPos = specialSphere.position.clone();
+
+                    let curve;
+                    let totalLength;
+
+                    if (useBezierCurve) {
+                        // Create quadratic Bezier curve: Start -> Blue (control) -> Red (end)
+                        const controlPos = specialSphereBlue.position.clone();
+                        curve = new THREE.QuadraticBezierCurve3(startPos, controlPos, endPos);
+                        // Approximate curve length
+                        totalLength = curve.getLength();
+                    } else {
+                        // Straight line distance
+                        totalLength = startPos.distanceTo(endPos);
+                    }
+
+                    // Calculate optimal number of segments (closest to 1.0 spacing)
+                    const numSegments = Math.max(1, Math.round(totalLength));
 
                     // Create spheres at division points
                     let currentParent = selectedDomino;
-                    const directionVec = new THREE.Vector3().subVectors(endPos, startPos).normalize();
-                    const segmentLength = distance / numSegments;
 
                     for (let i = 1; i <= numSegments; i++) {
                         const t = i / numSegments;
-                        const newPos = new THREE.Vector3().lerpVectors(startPos, endPos, t);
+                        let newPos;
+
+                        if (useBezierCurve) {
+                            // Get point on Bezier curve
+                            newPos = curve.getPoint(t);
+                        } else {
+                            // Linear interpolation
+                            newPos = new THREE.Vector3().lerpVectors(startPos, endPos, t);
+                        }
 
                         // Use parent's orientation for new spheres
                         const lastQuat = currentParent.group.quaternion;
@@ -2943,10 +2964,11 @@
 
                 updateHighlights();
                 recordUndo('creation', createdDominoes, previousSelection);
-                logAction(`Added Spheres to Special Sphere`);
+                logAction(useBezierCurve ? `Added Spheres along Bezier Curve` : `Added Spheres to Special Sphere`);
                 updateGlobalStats();
                 return;
             }
+
 
             // Original behavior for normal mode
             const newSelection = new Set();
@@ -4677,7 +4699,7 @@
         createButton("linear_scale", () => {
             addSpheresDirectional('straight');
             playClickSound();
-        }, '#4facfe', '#00f2fe', "Add Sphere (Straight)");
+        }, '#4facfe', '#00f2fe', "Add Sphere (Straight/Line)");
 
         createButton("call_split", () => {
             splitNWay();
