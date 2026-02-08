@@ -1771,6 +1771,21 @@
                 }
                 specialSphereVisible = false;
                 specialSphereSelected = false;
+
+                // Clear direction arrows if they were displayed for the red special sphere
+                if (directionArrow) {
+                    scene.remove(directionArrow);
+                    directionArrow = null;
+                }
+                if (upArrow) {
+                    scene.remove(upArrow);
+                    upArrow = null;
+                }
+
+                // Clear connection lines (dashed lines / Bezier curves)
+                specialSphereConnectionLines.forEach(line => scene.remove(line));
+                specialSphereConnectionLines = [];
+
                 logAction("Special Sphere Hidden");
             } else {
                 // Show special sphere
@@ -1780,6 +1795,9 @@
                 scene.add(specialSphere);
                 specialSphereVisible = true;
                 logAction("Special Sphere Shown at (12, 12, 12)");
+
+                // Trigger updateHighlights to draw connection lines if spheres are selected
+                updateHighlights();
             }
             updateSpecialSphereButton();
         }
