@@ -1772,21 +1772,10 @@
                 specialSphereVisible = false;
                 specialSphereSelected = false;
 
-                // Clear direction arrows if they were displayed for the red special sphere
-                if (directionArrow) {
-                    scene.remove(directionArrow);
-                    directionArrow = null;
-                }
-                if (upArrow) {
-                    scene.remove(upArrow);
-                    upArrow = null;
-                }
-
-                // Clear connection lines (dashed lines / Bezier curves)
-                specialSphereConnectionLines.forEach(line => scene.remove(line));
-                specialSphereConnectionLines = [];
-
                 logAction("Special Sphere Hidden");
+
+                // Trigger updateHighlights to clear arrows and connection lines
+                updateHighlights();
             } else {
                 // Show special sphere
                 if (!specialSphere) {
@@ -1794,7 +1783,13 @@
                 }
                 scene.add(specialSphere);
                 specialSphereVisible = true;
-                logAction("Special Sphere Shown at (12, 12, 12)");
+
+                // Auto-select the red special sphere (mutual exclusion with blue and yellow)
+                specialSphereSelected = true;
+                specialSphereBlueSelected = false;  // Deselect blue
+                specialSphereYellowSelected = false; // Deselect yellow
+
+                logAction("Special Sphere Shown and Selected");
 
                 // Trigger updateHighlights to draw connection lines if spheres are selected
                 updateHighlights();
@@ -1846,13 +1841,25 @@
                 specialSphereBlueVisible = false;
                 specialSphereBlueSelected = false;
                 logAction("Blue Special Sphere Hidden");
+
+                // Trigger updateHighlights to clear arrows and switch Bezier to straight line
+                updateHighlights();
             } else {
                 if (!specialSphereBlue) {
                     specialSphereBlue = createSpecialSphereBlue();
                 }
                 scene.add(specialSphereBlue);
                 specialSphereBlueVisible = true;
-                logAction("Blue Special Sphere Shown at (8, 8, 8)");
+
+                // Auto-select the blue special sphere (mutual exclusion with red and yellow)
+                specialSphereBlueSelected = true;
+                specialSphereSelected = false;  // Deselect red
+                specialSphereYellowSelected = false; // Deselect yellow
+
+                logAction("Blue Special Sphere Shown and Selected");
+
+                // Trigger updateHighlights to switch straight line to Bezier curve
+                updateHighlights();
             }
             updateSpecialSphereBlueButton();
         }
@@ -1901,13 +1908,22 @@
                 specialSphereYellowVisible = false;
                 specialSphereYellowSelected = false;
                 logAction("Yellow Special Sphere Hidden");
+                updateHighlights();
             } else {
                 if (!specialSphereYellow) {
                     specialSphereYellow = createSpecialSphereYellow();
                 }
                 scene.add(specialSphereYellow);
                 specialSphereYellowVisible = true;
-                logAction("Yellow Special Sphere Shown at (4, 4, 4)");
+
+                // Auto-select the yellow special sphere (mutual exclusion with others)
+                specialSphereYellowSelected = true;
+                specialSphereSelected = false;      // Deselect red
+                specialSphereBlueSelected = false;  // Deselect blue
+
+                logAction("Yellow Special Sphere Shown and Selected");
+
+                updateHighlights();
             }
             updateSpecialSphereYellowButton();
         }
@@ -3649,7 +3665,13 @@
             const coordDisplay = document.getElementById('coord-display');
             if (specialSphereSelected && specialSphere) {
                 const pos = specialSphere.position;
-                if (coordDisplay) coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Special Sphere`;
+                if (coordDisplay) coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Red Special Sphere`;
+            } else if (specialSphereBlueSelected && specialSphereBlue) {
+                const pos = specialSphereBlue.position;
+                if (coordDisplay) coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Blue Special Sphere`;
+            } else if (specialSphereYellowSelected && specialSphereYellow) {
+                const pos = specialSphereYellow.position;
+                if (coordDisplay) coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Yellow Special Sphere`;
             } else if (activeDomino && selectedDominoes.has(activeDomino) && activeDomino.group && activeDomino.group.position) {
                 const pos = activeDomino.group.position;
                 if (coordDisplay) coordDisplay.textContent = `X: ${pos.x.toFixed(2)} Y: ${pos.y.toFixed(2)} Z: ${pos.z.toFixed(2)} | Depth: ${activeDomino.depth}`;
@@ -4867,27 +4889,39 @@
             connectionLines.forEach(item => {
                 scene.remove(item.line);
                 item.line.geometry.dispose();
+                if (item.line.material) item.line.material.dispose();
             });
             connectionLines = [];
 
             if (!connectionLinesVisible) return;
 
             // Create lines for each parent-child relationship
-            const lineMaterial = new THREE.LineBasicMaterial({
-                color: 0x1edb06,
-                linewidth: 2,
-                transparent: true,
-                opacity: 0.8
-            });
-
             dominoes.forEach(domino => {
                 if (domino.children && domino.children.length > 0) {
                     const parentPos = domino.group.position;
+
+                    // Get parent sphere color
+                    let parentColor = 0x1edb06; // Default green
+                    const parentMesh = domino.group.children[0];
+                    if (parentMesh && parentMesh.material) {
+                        const mat = Array.isArray(parentMesh.material) ? parentMesh.material[0] : parentMesh.material;
+                        if (mat && mat.color) {
+                            parentColor = mat.color.getHex();
+                        }
+                    }
+
+                    const lineMaterial = new THREE.LineBasicMaterial({
+                        color: parentColor,
+                        linewidth: 2,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+
                     domino.children.forEach(child => {
                         const childPos = child.group.position;
                         const points = [parentPos.clone(), childPos.clone()];
                         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                        const line = new THREE.Line(geometry, lineMaterial);
+                        const line = new THREE.Line(geometry, lineMaterial.clone());
                         scene.add(line);
                         connectionLines.push({ line, parent: domino, child });
                     });
@@ -5405,6 +5439,8 @@
 
                     selectedType = 'domino';
                     specialSphereSelected = false;  // Deselect special sphere when selecting a domino
+                    specialSphereBlueSelected = false;
+                    specialSphereYellowSelected = false;
                     updateHighlights();
                     break;
                 }
@@ -5419,6 +5455,8 @@
                     selectedDominoes.clear();
                     activeDomino = null;
                     specialSphereSelected = false;  // Deselect special sphere when clicking background
+                    specialSphereBlueSelected = false;
+                    specialSphereYellowSelected = false;
                     updateHighlights();
                     selectedType = 'background';
                     logAction("Background Selected");
