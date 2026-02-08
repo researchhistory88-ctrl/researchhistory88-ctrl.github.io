@@ -2116,8 +2116,9 @@
                 });
                 rotationDisplay.style.display = 'block';
             } else {
-                // Drag ended: hide rotation display
+                // Drag ended: hide rotation display and clear stored quaternions
                 rotationDisplay.style.display = 'none';
+                initialDominoQuaternions.clear();
             }
         });
 
@@ -2872,24 +2873,43 @@
                     for (let i = 1; i <= numSegments; i++) {
                         const t = i / numSegments;
                         let newPos;
+                        let tangent;
 
                         if (useBezierCurve) {
                             // Get point on Bezier curve
                             newPos = curve.getPoint(t);
+                            // Get tangent (direction) at this point on the curve
+                            tangent = curve.getTangent(t).normalize();
                         } else {
                             // Linear interpolation
                             newPos = new THREE.Vector3().lerpVectors(startPos, endPos, t);
+                            // For straight line, tangent is the direction from start to end
+                            tangent = new THREE.Vector3().subVectors(endPos, startPos).normalize();
                         }
 
-                        // Use parent's orientation for new spheres
-                        const lastQuat = currentParent.group.quaternion;
+                        // Calculate orientation from tangent direction
+                        // The forward direction (Z+) should align with the tangent
+                        const forward = tangent;
+                        // Use world up as reference, but handle edge case where tangent is nearly vertical
+                        let worldUp = new THREE.Vector3(0, 1, 0);
+                        if (Math.abs(forward.dot(worldUp)) > 0.99) {
+                            // If tangent is nearly vertical, use different reference
+                            worldUp = new THREE.Vector3(0, 0, 1);
+                        }
+                        const right = new THREE.Vector3().crossVectors(worldUp, forward).normalize();
+                        const up = new THREE.Vector3().crossVectors(forward, right).normalize();
+
+                        // Create rotation matrix and quaternion from basis vectors
+                        const rotMatrix = new THREE.Matrix4().makeBasis(right, up, forward);
+                        const orientationQuat = new THREE.Quaternion().setFromRotationMatrix(rotMatrix);
+
                         const isGradation = document.getElementById('gradation-check').checked;
                         let currentIndex = (currentParent.gradationIndex !== undefined) ? currentParent.gradationIndex : 0;
                         const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
                         currentIndex++;
                         const color = isGradation ? getGradationColor(currentIndex, step) : null;
 
-                        const newDomino = createFullyOrientedDomino(newPos, lastQuat, color, currentParent);
+                        const newDomino = createFullyOrientedDomino(newPos, orientationQuat, color, currentParent);
                         newDomino.depth = currentParent.depth + 1;
                         newDomino.gradationIndex = currentIndex;
 
@@ -3538,11 +3558,20 @@
                     // Check if this is a non-standard geometry that needs rotation animation
                     const geometryType = mesh.userData.geometryType || 'standard';
                     const needsRotationAnim = geometryType !== 'standard';
+                    // Only Sphere (standard) geometry should have scale animation
+                    const needsScaleAnim = geometryType === 'standard';
 
                     // Initialize spark state if not present
                     if (domino.sparkTime === 0) {
                         mesh.visible = true;
-                        mesh.scale.set(0.01, 0.01, 0.01);
+                        // Only set initial small scale for Sphere geometry
+                        if (needsScaleAnim) {
+                            mesh.scale.set(0.01, 0.01, 0.01);
+                        } else {
+                            // Non-Sphere geometry: keep at base scale immediately
+                            const baseScale = mesh.userData.baseScale || new THREE.Vector3(1, 1, 1);
+                            mesh.scale.copy(baseScale);
+                        }
 
                         // Store base rotation for non-standard geometry rotation animation
                         if (needsRotationAnim) {
@@ -3580,9 +3609,11 @@
                     }
 
                     if (t < 0.2) {
-                        // Explosion phase 1: Rapid scale up (5x of base scale)
-                        const s = (t / 0.2) * 5.0;
-                        mesh.scale.set(baseScale.x * s, baseScale.y * s, baseScale.z * s);
+                        // Explosion phase 1: Rapid scale up (5x of base scale) - Only for Sphere
+                        if (needsScaleAnim) {
+                            const s = (t / 0.2) * 5.0;
+                            mesh.scale.set(baseScale.x * s, baseScale.y * s, baseScale.z * s);
+                        }
 
                         // Brighten emissive
                         if (mesh.material.emissive) {
@@ -3590,10 +3621,12 @@
                             mesh.material.emissiveIntensity = 2.0;
                         }
                     } else if (t < 0.5) {
-                        // Explosion phase 2: Settle to base scale
+                        // Explosion phase 2: Settle to base scale - Only for Sphere
                         const factor = (t - 0.2) / 0.3;
-                        const s = 5.0 - factor * 4.0; // 5.0 down to 1.0
-                        mesh.scale.set(baseScale.x * s, baseScale.y * s, baseScale.z * s);
+                        if (needsScaleAnim) {
+                            const s = 5.0 - factor * 4.0; // 5.0 down to 1.0
+                            mesh.scale.set(baseScale.x * s, baseScale.y * s, baseScale.z * s);
+                        }
 
                         // Restore original emissive
                         if (mesh.material.emissive) {
