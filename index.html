@@ -2425,7 +2425,8 @@
                 id: dominoId,
                 isDomino: true,
                 baseEmissive: bodyMaterial.emissive ? bodyMaterial.emissive.getHex() : 0x000000,
-                baseEmissiveIntensity: bodyMaterial.emissiveIntensity !== undefined ? bodyMaterial.emissiveIntensity : 1.0
+                baseEmissiveIntensity: bodyMaterial.emissiveIntensity !== undefined ? bodyMaterial.emissiveIntensity : 1.0,
+                geometryType: geometryType
             };
             if (isRainbowMode) {
                 dominoMesh.userData.hue = (dominoes.length * 0.05) % 1.0;
@@ -2511,7 +2512,8 @@
                 id: dominoId,
                 isDomino: true,
                 baseEmissive: bodyMaterial.emissive ? bodyMaterial.emissive.getHex() : 0x000000,
-                baseEmissiveIntensity: bodyMaterial.emissiveIntensity !== undefined ? bodyMaterial.emissiveIntensity : 1.0
+                baseEmissiveIntensity: bodyMaterial.emissiveIntensity !== undefined ? bodyMaterial.emissiveIntensity : 1.0,
+                geometryType: geometryType
             };
             if (isRainbowMode) {
                 dominoMesh.userData.hue = (dominoes.length * 0.05) % 1.0;
@@ -3533,10 +3535,22 @@
 
 
                 if (domino.isSparking && !domino.exploded) {
+                    // Check if this is a non-standard geometry that needs rotation animation
+                    const geometryType = mesh.userData.geometryType || 'standard';
+                    const needsRotationAnim = geometryType !== 'standard';
+
                     // Initialize spark state if not present
                     if (domino.sparkTime === 0) {
                         mesh.visible = true;
                         mesh.scale.set(0.01, 0.01, 0.01);
+
+                        // Store base rotation for non-standard geometry rotation animation
+                        if (needsRotationAnim) {
+                            // Store the target (final) rotation
+                            mesh.userData.sparkTargetRotation = mesh.rotation.clone();
+                            // Start with 90 degrees (PI/2) offset on X-axis
+                            mesh.rotation.x = mesh.userData.sparkTargetRotation.x - Math.PI / 2;
+                        }
 
                         // Show connection lines from this sphere to its children
                         if (typeof showConnectionLinesForSphere !== 'undefined' && typeof connectionLinesVisible !== 'undefined' && connectionLinesVisible) {
@@ -3553,6 +3567,17 @@
                     const t = domino.sparkTime;
                     // Get base scale (from Enlarge) or use default (1,1,1)
                     const baseScale = mesh.userData.baseScale || new THREE.Vector3(1, 1, 1);
+
+                    // Rotation animation for non-standard geometry objects
+                    if (needsRotationAnim && mesh.userData.sparkTargetRotation) {
+                        const targetRot = mesh.userData.sparkTargetRotation;
+                        // Animate rotation over the entire spark duration (0 to 0.5)
+                        const rotProgress = Math.min(t / 0.5, 1.0);
+                        // Ease out for smooth deceleration
+                        const easedProgress = 1 - Math.pow(1 - rotProgress, 2);
+                        // Interpolate from start rotation (target - PI/2) to target rotation
+                        mesh.rotation.x = targetRot.x - (Math.PI / 2) * (1 - easedProgress);
+                    }
 
                     if (t < 0.2) {
                         // Explosion phase 1: Rapid scale up (5x of base scale)
@@ -3586,6 +3611,11 @@
                             const baseCol = mesh.userData.baseEmissive || 0x000000;
                             mesh.material.emissive.setHex(baseCol);
                             mesh.material.emissiveIntensity = 1.0;
+                        }
+                        // Ensure final rotation is exactly the target for non-standard geometry
+                        if (needsRotationAnim && mesh.userData.sparkTargetRotation) {
+                            mesh.rotation.copy(mesh.userData.sparkTargetRotation);
+                            delete mesh.userData.sparkTargetRotation;
                         }
                         domino.exploded = true;
                         domino.isSparking = false;
