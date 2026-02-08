@@ -3972,6 +3972,9 @@
                     // Create new geometry
                     const newGeometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, selectedValue);
                     mesh.geometry = newGeometry;
+
+                    // Update geometryType so spark animation knows the correct type
+                    mesh.userData.geometryType = selectedValue;
                 });
                 logAction(`Geometry Changed: ${selectedValue}`);
             } else {
