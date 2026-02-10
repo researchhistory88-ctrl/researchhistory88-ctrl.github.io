@@ -422,6 +422,10 @@
                     style="color: #ff9800;">
                     <span class="material-icons">shuffle</span>
                 </button>
+                <button id="remain-mod-btn" class="icon-btn" title="Remain Mod n (keep every n-th sphere)"
+                    style="color: #e091ff;">
+                    <span class="material-icons">filter_alt</span>
+                </button>
                 <button id="align-btn" class="icon-btn" title="Align Selected Spheres (Match orientation)"
                     style="color: #FFEB3B;">
                     <span class="material-icons">align_horizontal_center</span>
@@ -445,7 +449,7 @@
 
             <!-- 2. Turn Radius -->
             <div>
-                <label for="radius-select">Add Num / Radius / Move N / N-Way / Unselect Ratio:</label>
+                <label for="radius-select">Add Num / Radius / Move N / N-Way / Unselect Ratio / Remain Mod:</label>
                 <select id="radius-select" style="width: 60px;">
                     <!-- Options populated by script -->
                 </select>
@@ -1175,6 +1179,29 @@
             }
         });
 
+        // Remain Mod n Logic
+        document.getElementById('remain-mod-btn').addEventListener('click', () => {
+            if (selectedDominoes.size > 1) {
+                recordSelectionHistory();
+                const n = parseInt(document.getElementById('radius-select').value) || 2;
+                const sorted = Array.from(selectedDominoes).sort((a, b) => a.id - b.id);
+                const toRemove = [];
+                sorted.forEach((d, i) => {
+                    if (i % n !== 0) {
+                        toRemove.push(d);
+                    }
+                });
+                toRemove.forEach(d => selectedDominoes.delete(d));
+
+                if (activeDomino && !selectedDominoes.has(activeDomino)) {
+                    activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
+                }
+
+                updateHighlights();
+                logAction(`Remain Mod ${n}: kept ${sorted.length - toRemove.length}, removed ${toRemove.length} spheres`);
+            }
+        });
+
         // Align Button logic
         document.getElementById('align-btn').addEventListener('click', () => {
             if (selectedDominoes.size === 0) {
@@ -1300,6 +1327,17 @@
         unselectRandomBtn.addEventListener('mouseout', () => {
             unselectRandomBtn.style.background = 'rgba(255, 255, 255, 0.1)';
             unselectRandomBtn.style.transform = 'scale(1)';
+        });
+
+        // Hover effect for the remain mod button
+        const remainModBtn = document.getElementById('remain-mod-btn');
+        remainModBtn.addEventListener('mouseover', () => {
+            remainModBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+            remainModBtn.style.transform = 'scale(1.1)';
+        });
+        remainModBtn.addEventListener('mouseout', () => {
+            remainModBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            remainModBtn.style.transform = 'scale(1)';
         });
 
         // Hover effect for the delete button
@@ -2018,6 +2056,11 @@
                 updateHighlights();
                 updateGlobalStats();
                 logAction("Undo Performed");
+            } else if (action.type === 'backgroundColorChange') {
+                // Restore previous background color
+                scene.background.set(action.previousColor);
+                document.getElementById('color-picker').value = action.previousColor;
+                logAction("Undo Performed");
             }
         }
 
@@ -2293,6 +2336,11 @@
         let activeDomino = null; // The currently selected domino for adding new ones
         const selectedDominoes = new Set(); // Track all selected dominoes
 
+        // Spiral State Map (WeakMap to allow GC)
+        // Key: Domino (the tip from which we might continue)
+        // Value: Object { direction, radius, spiralCenter, k, branchForward, localUp, nextTheta, spiralStepIndex }
+        const spiralStates = new WeakMap();
+
         // Raycasting for selection
         const raycaster = new THREE.Raycaster();
         const pointer = new THREE.Vector2();
@@ -2314,8 +2362,8 @@
                 shape.lineTo(-w, 0);
                 shape.lineTo(0, h);
             } else if (type === 'petal') {
-                // Heart shape logic
-                const x = 0, y = 0;
+                // Heart shape logic - pivot at bottom
+                const x = 0, y = h; // Shift up by h so bottom is at origin
                 // Scale factor to fit within width/height
                 const s = Math.min(w, h) / 2.5;
 
@@ -2368,6 +2416,21 @@
             return c1.lerp(c2, f).getStyle();
         }
 
+        function applyGradationToSelection() {
+            const isGradation = document.getElementById('gradation-check').checked;
+            if (!isGradation || selectedDominoes.size <= 1) return false;
+            const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+            const sorted = Array.from(selectedDominoes).sort((a, b) => a.id - b.id);
+            sorted.forEach((domino, i) => {
+                const color = getGradationColor(i, step);
+                const mesh = domino.group.children[0];
+                const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+                mat.color.set(color);
+            });
+            updateHighlights();
+            return true;
+        }
+
         function createDominoAt(x, z, rotationY = 0, color = null, parent = null) {
             const dominoGroup = new THREE.Group();
             dominoGroup.rotation.order = 'YXZ';
@@ -2397,10 +2460,16 @@
                 });
             }
 
-            const sphereGeo = new THREE.SphereGeometry(0.1, 32, 32);
+            // Create mesh with appropriate geometry
+            let meshGeo;
+            if (geometryType === 'standard') {
+                meshGeo = new THREE.SphereGeometry(0.1, 32, 32);
+            } else {
+                meshGeo = geometry;
+            }
             const sphereMat = bodyMaterial.clone();
 
-            const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+            const sphereMesh = new THREE.Mesh(meshGeo, sphereMat);
             sphereMesh.position.set(0, 0, 0); // Center at pivot
             sphereMesh.visible = true;
             sphereMesh.scale.set(1, 1, 1);
@@ -2455,14 +2524,14 @@
 
 
 
-        function createFullyOrientedDomino(position, quaternion, color = null, parent = null) {
+        function createFullyOrientedDomino(position, quaternion, color = null, parent = null, overrideGeometryType = null) {
             const dominoGroup = new THREE.Group();
             dominoGroup.rotation.order = 'YXZ';
             dominoGroup.position.copy(position);
             dominoGroup.quaternion.copy(quaternion);
             scene.add(dominoGroup);
 
-            const geometryType = document.getElementById('geometry-select').value;
+            const geometryType = overrideGeometryType || document.getElementById('geometry-select').value;
             const geometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, geometryType);
 
             let bodyMaterial;
@@ -2484,9 +2553,14 @@
                 });
             }
 
-            // Create sphere instead of domino
-            const sphereGeo = new THREE.SphereGeometry(0.1, 32, 32);
-            const sphereMesh = new THREE.Mesh(sphereGeo, bodyMaterial.clone());
+            // Create mesh with appropriate geometry
+            let meshGeo;
+            if (geometryType === 'standard') {
+                meshGeo = new THREE.SphereGeometry(0.1, 32, 32);
+            } else {
+                meshGeo = geometry;
+            }
+            const sphereMesh = new THREE.Mesh(meshGeo, bodyMaterial.clone());
             sphereMesh.position.set(0, 0, 0); // Center at pivot
             sphereMesh.visible = true;
             sphereMesh.scale.set(1, 1, 1);
@@ -3077,29 +3151,38 @@
 
                         const branchItems = [];
                         if (spiralDirection === '+') {
-                            const spiralCenter = lastPos.clone();
-                            const k = r0 / totalTheta;
-                            // branchForward is just localForward rotated by branchRot (which is around localForward, so it's the same, but for consistency)
-                            const branchForward = localForward.clone().applyQuaternion(branchRot);
+                            // n * PI loop based on Add Num
+                            const n = radius;
+                            const totalTheta = n * Math.PI;
+                            // Restore original tightness: k = radius / (6 * PI)
+                            // This ensures the spiral shape matches previous behavior regardless of length n.
+                            const k = radius / (6 * Math.PI);
 
-                            currentTheta = (k > 0) ? targetSpacing / k : 0.1;
+                            // Use offset center like normal turns
+                            const currentCenter = center.clone();
+                            const currentStartVec = startVec.clone();
+                            const localUpRef = localUp.clone();
+                            const lastQuatRef = lastQuat.clone();
+                            const branchRotRef = branchRot.clone();
+
+                            let currentTheta = targetSpacing / radius;
+                            let spiralStepIndex = 0;
 
                             while (currentTheta < totalTheta) {
-                                const currentR = k * currentTheta;
-                                const dSToDTheta = k * Math.sqrt(currentTheta * currentTheta + 1);
+                                const nextR = radius + k * currentTheta;
+                                const dSToDTheta = Math.sqrt(k * k + nextR * nextR);
                                 const dTheta = targetSpacing / dSToDTheta;
 
-                                const nextVec = branchForward.clone().applyAxisAngle(localUp, currentTheta).multiplyScalar(currentR);
-                                let nextPos = spiralCenter.clone().add(nextVec);
+                                const nextVec = currentStartVec.clone().setLength(nextR).applyAxisAngle(localUpRef, currentTheta);
+                                let nextPos = currentCenter.clone().add(nextVec);
 
                                 if (isUpDown) {
-                                    nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                    nextPos.add(localUpRef.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
                                 }
 
-                                const rotAngle = currentTheta + Math.atan(currentTheta);
-                                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
-                                // Orientation: rotQuat * branchRot * lastQuat
-                                const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+                                const rotAngle = currentTheta + Math.atan(k / nextR);
+                                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUpRef, rotAngle);
+                                const newQuat = rotQuat.clone().multiply(branchRotRef).multiply(lastQuatRef);
 
                                 currentIndex++;
                                 const color = isGradation ? getGradationColor(currentIndex, step) : null;
@@ -3159,31 +3242,7 @@
                             }
                         }
 
-                        // Mirroring logic for spiral
-                        if (spiralDirection === '+') {
-                            const firstPos = lastPos;
-                            const lastPos_branch = branchItems[branchItems.length - 1].group.position;
-                            const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
-                            if (chordAxis.lengthSq() > 0.0001) {
-                                const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
-                                branchItems.forEach(domino => {
-                                    const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
-                                    const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
-                                    const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
-                                    domino.group.position.copy(mirroredPos);
 
-                                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
-                                    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(domino.group.quaternion);
-                                    const fwdProj = chordAxis.clone().multiplyScalar(forward.dot(chordAxis));
-                                    const mirroredForward = fwdProj.clone().multiplyScalar(2).sub(forward).normalize();
-                                    const upProj = chordAxis.clone().multiplyScalar(up.dot(chordAxis));
-                                    const mirroredUp = upProj.clone().multiplyScalar(2).sub(up).normalize();
-                                    const mirroredRight = new THREE.Vector3().crossVectors(mirroredUp, mirroredForward).normalize();
-                                    const matrix = new THREE.Matrix4().makeBasis(mirroredRight, mirroredUp, mirroredForward);
-                                    domino.group.quaternion.setFromRotationMatrix(matrix);
-                                });
-                            }
-                        }
                     } else {
                         const angles = [];
                         for (let n = 1; n <= radius + 1; n++) {
@@ -3232,31 +3291,7 @@
                             currentParent = newDomino;
                         });
 
-                        // Mirroring logic
-                        if (document.getElementById('spiral-direction').value === '+') {
-                            const firstPos = lastPos;
-                            const lastPos_branch = branchItems[branchItems.length - 1].group.position;
-                            const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
-                            if (chordAxis.lengthSq() > 0.0001) {
-                                const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
-                                branchItems.forEach(domino => {
-                                    const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
-                                    const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
-                                    const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
-                                    domino.group.position.copy(mirroredPos);
 
-                                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
-                                    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(domino.group.quaternion);
-                                    const fwdProj = chordAxis.clone().multiplyScalar(forward.dot(chordAxis));
-                                    const mirroredForward = fwdProj.clone().multiplyScalar(2).sub(forward).normalize();
-                                    const upProj = chordAxis.clone().multiplyScalar(up.dot(chordAxis));
-                                    const mirroredUp = upProj.clone().multiplyScalar(2).sub(up).normalize();
-                                    const mirroredRight = new THREE.Vector3().crossVectors(mirroredUp, mirroredForward).normalize();
-                                    const matrix = new THREE.Matrix4().makeBasis(mirroredRight, mirroredUp, mirroredForward);
-                                    domino.group.quaternion.setFromRotationMatrix(matrix);
-                                });
-                            }
-                        }
                     }
                     newSelection.add(currentParent);
                 }
@@ -3326,28 +3361,35 @@
 
                         const branchItems = [];
                         if (spiralDirection === '+') {
-                            const spiralCenter = lastPos.clone();
-                            const k = r0 / totalTheta;
-                            const branchForward = localForward.clone().applyQuaternion(branchRot);
+                            // n * PI loop based on Add Num
+                            const n = radius;
+                            const totalTheta = n * Math.PI;
+                            const k = radius / (6 * Math.PI);
 
-                            currentTheta = (k > 0) ? targetSpacing / k : 0.1;
+                            const currentCenter = center.clone();
+                            const currentStartVec = startVec.clone();
+                            const localUpRef = localUp.clone();
+                            const lastQuatRef = lastQuat.clone();
+                            const branchRotRef = branchRot.clone();
+
+                            let currentTheta = targetSpacing / radius;
+                            let spiralStepIndex = 0;
 
                             while (currentTheta < totalTheta) {
-                                const currentR = k * currentTheta;
-                                const dSToDTheta = k * Math.sqrt(currentTheta * currentTheta + 1);
+                                const nextR = radius + k * currentTheta;
+                                const dSToDTheta = Math.sqrt(k * k + nextR * nextR);
                                 const dTheta = targetSpacing / dSToDTheta;
 
-                                // CW rotation uses -currentTheta
-                                const nextVec = branchForward.clone().applyAxisAngle(localUp, -currentTheta).multiplyScalar(currentR);
-                                let nextPos = spiralCenter.clone().add(nextVec);
+                                const nextVec = currentStartVec.clone().setLength(nextR).applyAxisAngle(localUpRef, -currentTheta);
+                                let nextPos = currentCenter.clone().add(nextVec);
 
                                 if (isUpDown) {
-                                    nextPos.add(localUp.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
+                                    nextPos.add(localUpRef.clone().multiplyScalar(yOffset * (spiralStepIndex + 1)));
                                 }
 
-                                const rotAngle = -(currentTheta + Math.atan(currentTheta));
-                                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUp, rotAngle);
-                                const newQuat = rotQuat.clone().multiply(branchRot).multiply(lastQuat);
+                                const rotAngle = -(currentTheta + Math.atan(k / nextR));
+                                const rotQuat = new THREE.Quaternion().setFromAxisAngle(localUpRef, rotAngle);
+                                const newQuat = rotQuat.clone().multiply(branchRotRef).multiply(lastQuatRef);
 
                                 currentIndex++;
                                 const color = isGradation ? getGradationColor(currentIndex, step) : null;
@@ -3406,31 +3448,7 @@
                             }
                         }
 
-                        // Mirroring logic for spiral
-                        if (spiralDirection === '+') {
-                            const firstPos = lastPos;
-                            const lastPos_branch = branchItems[branchItems.length - 1].group.position;
-                            const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
-                            if (chordAxis.lengthSq() > 0.0001) {
-                                const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
-                                branchItems.forEach(domino => {
-                                    const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
-                                    const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
-                                    const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
-                                    domino.group.position.copy(mirroredPos);
 
-                                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
-                                    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(domino.group.quaternion);
-                                    const fwdProj = chordAxis.clone().multiplyScalar(forward.dot(chordAxis));
-                                    const mirroredForward = fwdProj.clone().multiplyScalar(2).sub(forward).normalize();
-                                    const upProj = chordAxis.clone().multiplyScalar(up.dot(chordAxis));
-                                    const mirroredUp = upProj.clone().multiplyScalar(2).sub(up).normalize();
-                                    const mirroredRight = new THREE.Vector3().crossVectors(mirroredUp, mirroredForward).normalize();
-                                    const matrix = new THREE.Matrix4().makeBasis(mirroredRight, mirroredUp, mirroredForward);
-                                    domino.group.quaternion.setFromRotationMatrix(matrix);
-                                });
-                            }
-                        }
                     } else {
                         const angles = [];
                         for (let n = 1; n <= radius + 1; n++) {
@@ -3470,31 +3488,7 @@
                             currentParent = newDomino;
                         });
 
-                        // Mirroring logic
-                        if (document.getElementById('spiral-direction').value === '+') {
-                            const firstPos = lastPos;
-                            const lastPos_branch = branchItems[branchItems.length - 1].group.position;
-                            const chordAxis = new THREE.Vector3().subVectors(lastPos_branch, firstPos).normalize();
-                            if (chordAxis.lengthSq() > 0.0001) {
-                                const startUp = new THREE.Vector3(0, 1, 0).applyQuaternion(lastQuat);
-                                branchItems.forEach(domino => {
-                                    const v = new THREE.Vector3().subVectors(domino.group.position, firstPos);
-                                    const projection = chordAxis.clone().multiplyScalar(v.dot(chordAxis));
-                                    const mirroredPos = firstPos.clone().add(projection.multiplyScalar(2).sub(v));
-                                    domino.group.position.copy(mirroredPos);
 
-                                    const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(domino.group.quaternion);
-                                    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(domino.group.quaternion);
-                                    const fwdProj = chordAxis.clone().multiplyScalar(forward.dot(chordAxis));
-                                    const mirroredForward = fwdProj.clone().multiplyScalar(2).sub(forward).normalize();
-                                    const upProj = chordAxis.clone().multiplyScalar(up.dot(chordAxis));
-                                    const mirroredUp = upProj.clone().multiplyScalar(2).sub(up).normalize();
-                                    const mirroredRight = new THREE.Vector3().crossVectors(mirroredUp, mirroredForward).normalize();
-                                    const matrix = new THREE.Matrix4().makeBasis(mirroredRight, mirroredUp, mirroredForward);
-                                    domino.group.quaternion.setFromRotationMatrix(matrix);
-                                });
-                            }
-                        }
                     }
                     newSelection.add(currentParent);
                 }
@@ -3871,14 +3865,22 @@
             const colorVal = e.target.value;
             // Priority: Dominoes > Ground > Background
             if (selectedDominoes.size > 0) {
-                selectedDominoes.forEach(domino => {
-                    const mesh = domino.group.children[0];
-                    const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-                    mat.color.set(colorVal);
-                });
-                updateHighlights();
+                if (!applyGradationToSelection()) {
+                    selectedDominoes.forEach(domino => {
+                        const mesh = domino.group.children[0];
+                        const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+                        mat.color.set(colorVal);
+                    });
+                    updateHighlights();
+                }
             } else if (selectedType === 'background') {
+                const previousColor = '#' + scene.background.getHexString();
                 scene.background.set(colorVal);
+                undoStack.push({
+                    type: 'backgroundColorChange',
+                    previousColor: previousColor
+                });
+                if (undoStack.length > 50) undoStack.shift();
                 logAction(`Background Color Changed: ${colorVal}`);
             }
         });
@@ -3887,6 +3889,9 @@
         const colorPicker2 = document.getElementById('color-picker-2');
         colorPicker2.addEventListener('input', (e) => {
             logAction(`Color 2 Changed: ${e.target.value}`);
+            if (selectedDominoes.size > 1) {
+                applyGradationToSelection();
+            }
         });
 
         // Material Select
@@ -5496,11 +5501,34 @@
                             logAction(`Sphere Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''}) [Multi]`);
                         }
                     } else {
-                        // Single selection (or single branch selection)
-                        selectedDominoes.clear();
-                        targets.forEach(t => selectedDominoes.add(t));
-                        activeDomino = clickedDomino;
-                        logAction(`Sphere Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''})`);
+                        // Single selection mode
+                        if (selectedDominoes.has(clickedDomino)) {
+                            if (isDescendantsMode) {
+                                // Descendants mode: deselect clicked sphere + descendants, keep ancestors
+                                targets.forEach(t => selectedDominoes.delete(t));
+                                if (activeDomino && !selectedDominoes.has(activeDomino)) {
+                                    activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
+                                }
+                                logAction(`Sphere Deselected (ID: ${clickedDomino.id} + descendants)`);
+                            } else {
+                                // Non-descendants: deselect if it's the only selection
+                                if (selectedDominoes.size === 1) {
+                                    selectedDominoes.delete(clickedDomino);
+                                    activeDomino = null;
+                                    logAction(`Sphere Deselected (ID: ${clickedDomino.id})`);
+                                } else {
+                                    selectedDominoes.clear();
+                                    selectedDominoes.add(clickedDomino);
+                                    activeDomino = clickedDomino;
+                                    logAction(`Sphere Selected (ID: ${clickedDomino.id})`);
+                                }
+                            }
+                        } else {
+                            selectedDominoes.clear();
+                            targets.forEach(t => selectedDominoes.add(t));
+                            activeDomino = clickedDomino;
+                            logAction(`Sphere Selected (ID: ${clickedDomino.id}${isDescendantsMode ? ' + descendants' : ''})`);
+                        }
                     }
 
                     selectedType = 'domino';
@@ -5622,6 +5650,19 @@
                 const targetMesh = target.group.children[0];
                 const targetMat = Array.isArray(targetMesh.material) ? targetMesh.material[0] : targetMesh.material;
                 targetMat.color.setHex(rootData.color);
+                // Apply geometry type from copied root to target
+                if (rootData.geometryType) {
+                    const currentType = targetMesh.userData.geometryType || 'standard';
+                    if (currentType !== rootData.geometryType) {
+                        targetMesh.geometry.dispose();
+                        if (rootData.geometryType === 'standard') {
+                            targetMesh.geometry = new THREE.SphereGeometry(0.1, 32, 32);
+                        } else {
+                            targetMesh.geometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, rootData.geometryType);
+                        }
+                        targetMesh.userData.geometryType = rootData.geometryType;
+                    }
+                }
                 // Apply scale from copied root to target
                 if (rootData.scale) {
                     targetMesh.scale.copy(rootData.scale);
@@ -5646,7 +5687,7 @@
                     const newQuat = rootQuat.clone().multiply(data.relQuat);
 
                     // Create the new sphere
-                    const newSphere = createFullyOrientedDomino(newPos, newQuat, data.color, parent);
+                    const newSphere = createFullyOrientedDomino(newPos, newQuat, data.color, parent, data.geometryType);
                     newSphere.depth = parent.depth + 1;
 
                     // Apply scale from copied data
