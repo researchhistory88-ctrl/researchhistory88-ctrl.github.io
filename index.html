@@ -176,7 +176,7 @@
             padding: 10px !important;
             gap: 8px !important;
             display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
         }
 
         body.mobile-mode #color-gradation-group {
@@ -193,16 +193,22 @@
             flex-direction: row !important;
             align-items: center !important;
             gap: 2px !important;
+            width: 100% !important;
+            /* Ensure it takes available space */
+            justify-content: flex-start !important;
         }
 
         body.mobile-mode #color-gradation-group label {
             font-size: 9px !important;
             white-space: nowrap !important;
+            /* Keep color labels on one line if possible, or wrap if critical */
         }
 
         body.mobile-mode #color-gradation-group input[type="color"] {
             width: 24px !important;
             height: 24px !important;
+            min-width: 24px !important;
+            /* Prevent shrinking */
         }
 
         body.mobile-mode #color-gradation-group input[type="checkbox"] {
@@ -214,11 +220,17 @@
             align-items: flex-start !important;
             gap: 4px !important;
             display: flex !important;
+            min-width: 0 !important;
+            /* Allow flex item to shrink below content size */
         }
 
         body.mobile-mode #parameters-container label {
             font-size: 11px !important;
-            white-space: nowrap !important;
+            white-space: normal !important;
+            /* Allow wrapping for long labels */
+            word-break: break-word !important;
+            /* Ensure long words break if necessary */
+            line-height: 1.2 !important;
         }
 
         body.mobile-mode #parameters-container select,
