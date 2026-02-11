@@ -1520,10 +1520,16 @@
                         }
                         d.isFalling = false;
                         d.fallen = false;
-                        d.fallen = false;
                         d.triggeredNext = false;
                         d.isBlocked = false;
                         d.suggestedFallDirection = undefined;
+
+                        // Restore original rotation for non-standard geometry if interrupted
+                        const mesh = d.group.children[0];
+                        if (mesh.userData.sparkTargetRotation) {
+                            mesh.rotation.copy(mesh.userData.sparkTargetRotation);
+                            delete mesh.userData.sparkTargetRotation;
+                        }
                     });
                     logAction("Animation Reset");
                     break;
@@ -3581,8 +3587,10 @@
 
                         // Store base rotation for non-standard geometry rotation animation
                         if (needsRotationAnim) {
-                            // Store the target (final) rotation
-                            mesh.userData.sparkTargetRotation = mesh.rotation.clone();
+                            // Store the target (final) rotation only if not already stored (avoid overwriting with mid-animation value)
+                            if (!mesh.userData.sparkTargetRotation) {
+                                mesh.userData.sparkTargetRotation = mesh.rotation.clone();
+                            }
                             // Start with 90 degrees (PI/2) offset on X-axis
                             mesh.rotation.x = mesh.userData.sparkTargetRotation.x - Math.PI / 2;
                         }
@@ -3836,6 +3844,12 @@
                     }
                     d.isFalling = false;
                     d.fallen = false;
+
+                    // Restore original rotation for non-standard geometry if interrupted
+                    if (mesh.userData.sparkTargetRotation) {
+                        mesh.rotation.copy(mesh.userData.sparkTargetRotation);
+                        delete mesh.userData.sparkTargetRotation;
+                    }
                 });
 
                 // Restore connection lines visibility on reset
