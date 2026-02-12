@@ -4265,15 +4265,57 @@
             }
 
             if (hit) {
+                const isMulti = document.getElementById('multi-select-check').checked || e.ctrlKey;
+                const isDescendants = document.getElementById('descendants-check').checked;
+
                 if (selectedDominoes.has(hit)) {
-                    selectedDominoes.delete(hit);
-                    logAction(`Domino Deselected from Tree (ID: ${hit.id})`);
+                    // Deselect logic with descendants support
+                    const targets = new Set();
+                    targets.add(hit);
+                    if (isDescendants) {
+                        const addDescendants = (d) => {
+                            if (d.children) {
+                                d.children.forEach(child => {
+                                    if (!targets.has(child)) {
+                                        targets.add(child);
+                                        addDescendants(child);
+                                    }
+                                });
+                            }
+                        };
+                        addDescendants(hit);
+                    }
+
+                    targets.forEach(t => selectedDominoes.delete(t));
+
+                    if (activeDomino === hit || !selectedDominoes.has(activeDomino)) {
+                        activeDomino = selectedDominoes.size > 0 ? Array.from(selectedDominoes).pop() : null;
+                    }
+
+                    logAction(`Domino Deselected from Tree (ID: ${hit.id}${isDescendants ? ' + descendants' : ''})`);
                 } else {
-                    const isMulti = document.getElementById('multi-select-check').checked || e.ctrlKey;
+                    // Select logic with descendants support
                     if (!isMulti) selectedDominoes.clear();
-                    selectedDominoes.add(hit);
+
+                    const targets = new Set();
+                    targets.add(hit);
+                    if (isDescendants) {
+                        const addDescendants = (d) => {
+                            if (d.children) {
+                                d.children.forEach(child => {
+                                    if (!targets.has(child)) {
+                                        targets.add(child);
+                                        addDescendants(child);
+                                    }
+                                });
+                            }
+                        };
+                        addDescendants(hit);
+                    }
+
+                    targets.forEach(t => selectedDominoes.add(t));
                     activeDomino = hit;
-                    logAction(`Domino Selected from Tree (ID: ${hit.id})${e.ctrlKey ? ' [Ctrl]' : ''}`);
+                    logAction(`Domino Selected from Tree (ID: ${hit.id}${isDescendants ? ' + descendants' : ''})${isMulti ? ' [Multi]' : ''}`);
                 }
                 updateHighlights();
                 renderTree();
