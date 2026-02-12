@@ -405,6 +405,13 @@
                 <button id="enlarge-btn" class="icon-btn" title="Enlarge" style="color: #84fab0;">
                     <span class="material-icons">zoom_in</span>
                 </button>
+                <button id="reduce-btn" class="icon-btn" title="Reduce" style="color: #ff7675;">
+                    <span class="material-icons">zoom_out</span>
+                </button>
+                <button id="group-enlarge-btn" class="icon-btn" title="Group Enlarge (1x, 1.1x, 1.2x...)"
+                    style="color: #74b9ff;">
+                    <span class="material-icons">signal_cellular_alt</span>
+                </button>
                 <button id="connection-lines-btn" class="icon-btn" title="Toggle Connection Lines"
                     style="color: #00bcd4;">
                     <span class="material-icons">account_tree</span>
@@ -1397,6 +1404,28 @@
             pasteSubtree();
         });
 
+        // Hover effect for the reduce button
+        const reduceBtn = document.getElementById('reduce-btn');
+        reduceBtn.addEventListener('mouseover', () => {
+            reduceBtn.style.background = 'rgba(255, 118, 117, 0.2)';
+            reduceBtn.style.transform = 'scale(1.1)';
+        });
+        reduceBtn.addEventListener('mouseout', () => {
+            reduceBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            reduceBtn.style.transform = 'scale(1)';
+        });
+
+        // Hover effect for the group enlarge button
+        const groupEnlargeBtn = document.getElementById('group-enlarge-btn');
+        groupEnlargeBtn.addEventListener('mouseover', () => {
+            groupEnlargeBtn.style.background = 'rgba(116, 185, 255, 0.2)';
+            groupEnlargeBtn.style.transform = 'scale(1.1)';
+        });
+        groupEnlargeBtn.addEventListener('mouseout', () => {
+            groupEnlargeBtn.style.background = 'rgba(255, 255, 255, 0.1)';
+            groupEnlargeBtn.style.transform = 'scale(1)';
+        });
+
         function deleteSelected() {
             if (selectedDominoes.size === 0) return;
 
@@ -1641,9 +1670,25 @@
                     if (selectedDominoes.size > 0) {
                         selectedDominoes.forEach(domino => {
                             const mesh = domino.group.children[0];
-                            mesh.scale.x *= 2;
-                            mesh.scale.y *= 2;
-                            mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+
+                            // Adjust position based on geometry type
+                            if (mesh.geometry.type === 'SphereGeometry') {
+                                // For sphere: Scale uniformly in all directions, Center remains unchanged
+                                const factor = 2.0;
+                                mesh.scale.x *= factor;
+                                mesh.scale.y *= factor;
+                                mesh.scale.z *= factor;
+                                // DO NOT change position.y
+                            } else {
+                                // For box/shape: Scale planar dimensions, adjust position to stay on ground
+                                const factor = 2.0;
+                                mesh.scale.x *= factor;
+                                mesh.scale.y *= factor;
+                                // Do not scale Z (thickness) for flat shapes
+                                mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                            }
+                            // Update baseScale for persistence in Exhibition mode
+                            mesh.userData.baseScale = mesh.scale.clone();
                         });
                         logAction("Doubled Scale");
                     }
@@ -1652,11 +1697,66 @@
                     if (selectedDominoes.size > 0) {
                         selectedDominoes.forEach(domino => {
                             const mesh = domino.group.children[0];
-                            mesh.scale.x *= 1.19;
-                            mesh.scale.y *= 1.19;
-                            mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+
+                            if (mesh.geometry.type === 'SphereGeometry') {
+                                const factor = 1.19;
+                                mesh.scale.x *= factor;
+                                mesh.scale.y *= factor;
+                                mesh.scale.z *= factor;
+                            } else {
+                                const factor = 1.19;
+                                mesh.scale.x *= factor;
+                                mesh.scale.y *= factor;
+                                mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                            }
+                            // Update baseScale for persistence
+                            mesh.userData.baseScale = mesh.scale.clone();
                         });
                         logAction("Enlarged Scale");
+                    }
+                    break;
+                case 'reduceScale':
+                    if (selectedDominoes.size > 0) {
+                        selectedDominoes.forEach(domino => {
+                            const mesh = domino.group.children[0];
+
+                            if (mesh.geometry.type === 'SphereGeometry') {
+                                const factor = 1.19;
+                                mesh.scale.x /= factor;
+                                mesh.scale.y /= factor;
+                                mesh.scale.z /= factor;
+                            } else {
+                                const factor = 1.19;
+                                mesh.scale.x /= factor;
+                                mesh.scale.y /= factor;
+                                mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                            }
+                            // Update baseScale for persistence
+                            mesh.userData.baseScale = mesh.scale.clone();
+                        });
+                        logAction("Reduced Scale");
+                    }
+                    break;
+                case 'groupEnlargeScale':
+                    if (selectedDominoes.size > 0) {
+                        const sortedDominoes = Array.from(selectedDominoes).sort((a, b) => a.id - b.id);
+                        sortedDominoes.forEach((domino, index) => {
+                            const mesh = domino.group.children[0];
+                            const scaleFactor = 1 + (index * 0.1);
+
+                            if (mesh.geometry.type === 'SphereGeometry') {
+                                mesh.scale.x *= scaleFactor;
+                                mesh.scale.y *= scaleFactor;
+                                mesh.scale.z *= scaleFactor;
+                            } else {
+                                mesh.scale.x *= scaleFactor;
+                                mesh.scale.y *= scaleFactor;
+                                mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
+                            }
+                            // Update baseScale for persistence
+                            mesh.userData.baseScale = mesh.scale.clone();
+                        });
+                        logAction("Group Enlarged Scale");
                     }
                     break;
                 case 'undo':
@@ -4790,15 +4890,100 @@
             updateGlobalStats();
         }
 
-        createButton("linear_scale", () => {
+        // --- New 3-Column Layout for Action Buttons ---
+        const actionRow = document.createElement('div');
+        actionRow.style.gridColumn = "1 / -1";
+        actionRow.style.display = "grid";
+        actionRow.style.gridTemplateColumns = "1fr 1fr 1fr";
+        actionRow.style.gap = "8px";
+        btnContainer.appendChild(actionRow);
+
+        // Helper to add to specific container
+        function createButtonInContainer(container, iconName, onClick, color1, color2, tooltip) {
+            const btn = document.createElement('button');
+            btn.innerHTML = `<span class="material-icons" style="font-size: 20px;">${iconName}</span>`; // Slightly smaller icon
+            if (tooltip) btn.title = tooltip;
+            btn.style.cssText = `
+                pointer-events: auto;
+                padding: 10px 0; /* Reduced padding */
+                font-size: 14px;
+                background: linear-gradient(135deg, ${color1}, ${color2});
+                border: none;
+                border-radius: 8px;
+                color: white;
+                cursor: pointer;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                transition: transform 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+            `;
+            btn.onmouseover = () => {
+                btn.style.transform = 'translateY(-2px)';
+                btn.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)';
+            };
+            btn.onmouseout = () => {
+                btn.style.transform = 'translateY(0)';
+                btn.style.boxShadow = '0 4px 15px rgba(0,0,0,0.3)';
+            };
+            btn.addEventListener('click', onClick);
+            container.appendChild(btn);
+            return btn;
+        }
+
+        // 1. Straight
+        createButtonInContainer(actionRow, "linear_scale", () => {
             addSpheresDirectional('straight');
             playClickSound();
         }, '#4facfe', '#00f2fe', "Add Sphere (Straight/Line)");
 
-        createButton("call_split", () => {
+        // 2. N-Way Split
+        createButtonInContainer(actionRow, "call_split", () => {
             splitNWay();
             playClickSound();
         }, '#ff9a9e', '#fecfef', "N-Way Split");
+
+        // 3. Double Size Button (New Feature)
+        createButtonInContainer(actionRow, "aspect_ratio", () => {
+            if (selectedDominoes.size < 2) {
+                alert("Please select at least 2 objects.");
+                return;
+            }
+
+            // Find Base Object (Minimum ID)
+            let baseDomino = null;
+            let minId = Infinity;
+
+            selectedDominoes.forEach(d => {
+                if (d.id < minId) {
+                    minId = d.id;
+                    baseDomino = d;
+                }
+            });
+
+            if (!baseDomino) return;
+
+            const basePos = baseDomino.group.position.clone();
+
+            // Apply Transformation
+            selectedDominoes.forEach(d => {
+                if (d === baseDomino) return; // Base object doesn't move
+
+                // NewPos = BasePos + 2 * (OldPos - BasePos)
+                // Vector from Base to Old: v = OldPos - BasePos
+                // NewPos = BasePos + 2 * v
+                const oldPos = d.group.position.clone();
+                const v = oldPos.sub(basePos);
+                v.multiplyScalar(2);
+                const newPos = basePos.clone().add(v);
+
+                d.group.position.copy(newPos);
+            });
+
+            logAction("Double Size Layout Applied");
+            playClickSound();
+        }, '#a18cd1', '#fbc2eb', "Double Size (Expand Layout)");
 
         createButton("arrow_upward", () => {
             addSpheresDirectional('up');
@@ -4847,21 +5032,48 @@
 
 
         document.getElementById('enlarge-btn').addEventListener('click', () => {
-            if (selectedDominoes.size > 0) {
-                selectedDominoes.forEach(domino => {
-                    const mesh = domino.group.children[0];
-                    // Scale sphere uniformly in all dimensions (diameter changes)
-                    mesh.scale.x *= 1.2;
-                    mesh.scale.y *= 1.2;
-                    mesh.scale.z *= 1.2;
-                    // Store the new base scale for Spark Sphere animation
-                    mesh.userData.baseScale = mesh.scale.clone();
-                    // No position adjustment needed for spheres (center remains the same)
-                });
-                logAction("Enlarged Scale");
+            if (activeDomino && selectedDominoes.size === 0) {
+                selectedDominoes.add(activeDomino);
             }
-            playClickSound();
+            if (selectedDominoes.size > 0) {
+                const cmd = { type: 'enlargeScale' };
+                executeCommand(cmd);
+                recordStep(cmd);
+            } else {
+                logAction("Enlarge: No spheres selected");
+            }
         });
+
+        document.getElementById('reduce-btn').addEventListener('click', () => {
+            if (activeDomino && selectedDominoes.size === 0) {
+                selectedDominoes.add(activeDomino);
+            }
+            if (selectedDominoes.size > 0) {
+                const cmd = { type: 'reduceScale' };
+                executeCommand(cmd);
+                recordStep(cmd);
+            } else {
+                logAction("Reduce: No spheres selected");
+            }
+        });
+
+        document.getElementById('group-enlarge-btn').addEventListener('click', () => {
+            if (activeDomino && selectedDominoes.size === 0) {
+                selectedDominoes.add(activeDomino);
+            }
+            if (selectedDominoes.size > 1) { // Requires multiple selection
+                const cmd = { type: 'groupEnlargeScale' };
+                executeCommand(cmd);
+                recordStep(cmd);
+            } else {
+                if (selectedDominoes.size <= 1) {
+                    logAction("Group Enlarge: Select multiple spheres");
+                } else {
+                    logAction("Group Enlarge: No spheres selected");
+                }
+            }
+        });
+
 
         createButton("west", () => {
             const n = parseInt(document.getElementById('radius-select').value);
