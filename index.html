@@ -3396,7 +3396,8 @@
 
                         currentIndex++;
                         const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
+                        const parentGeomType = selectedDomino.group.children[0]?.userData.geometryType || document.getElementById('geometry-select').value;
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent, parentGeomType);
                         newDomino.gradationIndex = currentIndex;
                         newDomino.depth = currentParent.depth + 1;
 
@@ -3693,7 +3694,8 @@
 
                         currentIndex++;
                         const color = isGradation ? getGradationColor(currentIndex, step) : null;
-                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
+                        const parentGeomType = selectedDomino.group.children[0]?.userData.geometryType || document.getElementById('geometry-select').value;
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent, parentGeomType);
                         newDomino.gradationIndex = currentIndex;
                         newDomino.depth = currentParent.depth + 1;
 
