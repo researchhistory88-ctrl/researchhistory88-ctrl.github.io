@@ -3026,23 +3026,37 @@
             }
 
             // Draw dashed connection lines from selected dominoes to special sphere (if visible)
-            if (specialSphere && specialSphereVisible && selectedDominoes.size > 0) {
+            // Skip when Yellow ON + Blue OFF (axis rotation mode uses infinite line instead)
+            if (specialSphere && specialSphereVisible && selectedDominoes.size > 0 &&
+                !(specialSphereYellow && specialSphereYellowVisible && !(specialSphereBlue && specialSphereBlueVisible))) {
+                const useYellow = specialSphereYellow && specialSphereYellowVisible;
+                const useBlue = specialSphereBlue && specialSphereBlueVisible;
+
                 selectedDominoes.forEach(d => {
                     let geometry;
 
-                    // If both red and blue special spheres are visible, draw quadratic Bezier curve
-                    if (specialSphereBlue && specialSphereBlueVisible) {
-                        // Create quadratic Bezier curve
-                        // Start: selected sphere, Control: blue sphere, End: red sphere
+                    if (useBlue && useYellow) {
+                        // Red ON + Blue ON + Yellow ON: Cubic Bezier curve
+                        // Start: selected sphere, CP1: blue, CP2: yellow, End: red
+                        const curve = new THREE.CubicBezierCurve3(
+                            d.group.position.clone(),              // Start point
+                            specialSphereBlue.position.clone(),    // Control point 1 (blue)
+                            specialSphereYellow.position.clone(),  // Control point 2 (yellow)
+                            specialSphere.position.clone()         // End point (red)
+                        );
+                        const points = curve.getPoints(80); // More segments for smooth cubic curve
+                        geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    } else if (useBlue && !useYellow) {
+                        // Red ON + Blue ON + Yellow OFF: Quadratic Bezier curve (unchanged)
                         const curve = new THREE.QuadraticBezierCurve3(
                             d.group.position.clone(),           // Start point
                             specialSphereBlue.position.clone(), // Control point (blue)
                             specialSphere.position.clone()      // End point (red)
                         );
-                        const points = curve.getPoints(50); // 50 segments for smooth curve
+                        const points = curve.getPoints(50);
                         geometry = new THREE.BufferGeometry().setFromPoints(points);
                     } else {
-                        // Draw straight line if only red sphere is visible
+                        // Red ON + Blue OFF: Straight line (unchanged)
                         const points = [];
                         points.push(d.group.position.clone());
                         points.push(specialSphere.position.clone());
@@ -3063,6 +3077,33 @@
                     scene.add(line);
                     specialSphereConnectionLines.push(line);
                 });
+            }
+
+            // Draw infinite dashed line between red and yellow spheres (Red ON + Blue OFF + Yellow ON)
+            if (specialSphere && specialSphereVisible &&
+                specialSphereYellow && specialSphereYellowVisible &&
+                !(specialSphereBlue && specialSphereBlueVisible)) {
+                const redPos = specialSphere.position.clone();
+                const yellowPos = specialSphereYellow.position.clone();
+                const direction = new THREE.Vector3().subVectors(yellowPos, redPos).normalize();
+                const extendDist = 1000; // Extend far in both directions
+                const lineStart = redPos.clone().add(direction.clone().multiplyScalar(-extendDist));
+                const lineEnd = redPos.clone().add(direction.clone().multiplyScalar(extendDist));
+
+                const points = [lineStart, lineEnd];
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineDashedMaterial({
+                    color: 0xFFEB3B, // Yellow color for the infinite line
+                    dashSize: 0.3,
+                    gapSize: 0.15,
+                    linewidth: 1,
+                    opacity: 0.7,
+                    transparent: true
+                });
+                const line = new THREE.Line(geometry, material);
+                line.computeLineDistances();
+                scene.add(line);
+                specialSphereConnectionLines.push(line);
             }
 
         }
@@ -3100,8 +3141,11 @@
                 const createdDominoes = [];
                 const newSelection = new Set();
 
-                // Check if blue sphere is visible for Bezier curve mode
-                const useBezierCurve = specialSphereBlue && specialSphereBlueVisible;
+                // Check if blue/yellow spheres are visible for Bezier curve mode
+                const useBlue = specialSphereBlue && specialSphereBlueVisible;
+                const useYellow = specialSphereYellow && specialSphereYellowVisible;
+                const useCubicBezier = useBlue && useYellow;
+                const useQuadraticBezier = useBlue && !useYellow;
 
                 selectedDominoes.forEach(selectedDomino => {
                     const startPos = selectedDomino.group.position.clone();
@@ -3110,11 +3154,16 @@
                     let curve;
                     let totalLength;
 
-                    if (useBezierCurve) {
+                    if (useCubicBezier) {
+                        // Create cubic Bezier curve: Start -> Blue (CP1) -> Yellow (CP2) -> Red (end)
+                        const cp1 = specialSphereBlue.position.clone();
+                        const cp2 = specialSphereYellow.position.clone();
+                        curve = new THREE.CubicBezierCurve3(startPos, cp1, cp2, endPos);
+                        totalLength = curve.getLength();
+                    } else if (useQuadraticBezier) {
                         // Create quadratic Bezier curve: Start -> Blue (control) -> Red (end)
                         const controlPos = specialSphereBlue.position.clone();
                         curve = new THREE.QuadraticBezierCurve3(startPos, controlPos, endPos);
-                        // Approximate curve length
                         totalLength = curve.getLength();
                     } else {
                         // Straight line distance
@@ -3132,7 +3181,7 @@
                         let newPos;
                         let tangent;
 
-                        if (useBezierCurve) {
+                        if (useCubicBezier || useQuadraticBezier) {
                             // Get point on Bezier curve
                             newPos = curve.getPoint(t);
                             // Get tangent (direction) at this point on the curve
@@ -3192,7 +3241,7 @@
 
                 updateHighlights();
                 recordUndo('creation', createdDominoes, previousSelection);
-                logAction(useBezierCurve ? `Added Spheres along Bezier Curve` : `Added Spheres to Special Sphere`);
+                logAction((useCubicBezier || useQuadraticBezier) ? `Added Spheres along Bezier Curve` : `Added Spheres to Special Sphere`);
                 updateGlobalStats();
                 return;
             }
@@ -3288,6 +3337,92 @@
         function turnLeft() {
             if (selectedDominoes.size === 0) return;
             recordSelectionHistory();
+
+            // Axis rotation mode: Red ON + Blue OFF + Yellow ON
+            const axisMode = specialSphere && specialSphereVisible &&
+                specialSphereYellow && specialSphereYellowVisible &&
+                !(specialSphereBlue && specialSphereBlueVisible);
+
+            if (axisMode) {
+                const newSelection = new Set();
+                const previousSelection = new Set(selectedDominoes);
+                const createdDominoes = [];
+
+                // Axis direction: yellow → red (up direction)
+                const redPos = specialSphere.position.clone();
+                const yellowPos = specialSphereYellow.position.clone();
+                const axisDir = new THREE.Vector3().subVectors(redPos, yellowPos).normalize();
+
+                selectedDominoes.forEach(selectedDomino => {
+                    const spherePos = selectedDomino.group.position.clone();
+
+                    // Project sphere position onto axis to find closest point on axis
+                    const yellowToSphere = new THREE.Vector3().subVectors(spherePos, yellowPos);
+                    const projLength = yellowToSphere.dot(axisDir);
+                    const axisPoint = yellowPos.clone().add(axisDir.clone().multiplyScalar(projLength));
+
+                    // Radius = distance from sphere to axis
+                    const radialVec = new THREE.Vector3().subVectors(spherePos, axisPoint);
+                    const r = radialVec.length();
+
+                    if (r < 0.001) {
+                        // Sphere is on the axis, skip
+                        newSelection.add(selectedDomino);
+                        return;
+                    }
+
+                    // Calculate number of segments for ~1.0 spacing along the arc
+                    const arcLength = r * (Math.PI / 2); // 90 degrees
+                    const numSegments = Math.max(1, Math.round(arcLength));
+
+                    let currentParent = selectedDomino;
+                    let currentIndex = (selectedDomino.gradationIndex !== undefined) ? selectedDomino.gradationIndex : 0;
+                    const isGradation = document.getElementById('gradation-check').checked;
+                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+
+                    // Turn Left = CW (時計回り) when viewed from above (red=up)
+                    // Negative angle around axisDir = CW when looking down the axis
+                    for (let i = 1; i <= numSegments; i++) {
+                        const angle = -(i / numSegments) * (Math.PI / 2); // 0 to -90 degrees, negative = CW
+
+                        // Rotate radialVec around axis
+                        const rotatedVec = radialVec.clone().applyAxisAngle(axisDir, angle);
+                        const newPos = axisPoint.clone().add(rotatedVec);
+
+                        // Rotate orientation
+                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(axisDir, angle);
+                        const newQuat = rotQuat.clone().multiply(selectedDomino.group.quaternion).normalize();
+
+                        currentIndex++;
+                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
+                        newDomino.gradationIndex = currentIndex;
+                        newDomino.depth = currentParent.depth + 1;
+
+                        dominoes.push(newDomino);
+                        createdDominoes.push(newDomino);
+
+                        currentParent.children.push(newDomino);
+                        newDomino.parent = currentParent;
+                        currentParent = newDomino;
+                    }
+                    newSelection.add(currentParent);
+                });
+
+                selectedDominoes.clear();
+                newSelection.forEach(d => selectedDominoes.add(d));
+                if (selectedDominoes.size > 0) {
+                    activeDomino = Array.from(selectedDominoes).pop();
+                } else {
+                    activeDomino = null;
+                }
+
+                updateHighlights();
+                recordUndo('creation', createdDominoes, previousSelection);
+                logAction(`Turned Left (Axis Rotation)`);
+                updateGlobalStats();
+                return;
+            }
 
             const newSelection = new Set();
             const previousSelection = new Set(selectedDominoes);
@@ -3499,6 +3634,92 @@
         function turnRight() {
             if (selectedDominoes.size === 0) return;
             recordSelectionHistory();
+
+            // Axis rotation mode: Red ON + Blue OFF + Yellow ON
+            const axisMode = specialSphere && specialSphereVisible &&
+                specialSphereYellow && specialSphereYellowVisible &&
+                !(specialSphereBlue && specialSphereBlueVisible);
+
+            if (axisMode) {
+                const newSelection = new Set();
+                const previousSelection = new Set(selectedDominoes);
+                const createdDominoes = [];
+
+                // Axis direction: yellow → red (up direction)
+                const redPos = specialSphere.position.clone();
+                const yellowPos = specialSphereYellow.position.clone();
+                const axisDir = new THREE.Vector3().subVectors(redPos, yellowPos).normalize();
+
+                selectedDominoes.forEach(selectedDomino => {
+                    const spherePos = selectedDomino.group.position.clone();
+
+                    // Project sphere position onto axis to find closest point on axis
+                    const yellowToSphere = new THREE.Vector3().subVectors(spherePos, yellowPos);
+                    const projLength = yellowToSphere.dot(axisDir);
+                    const axisPoint = yellowPos.clone().add(axisDir.clone().multiplyScalar(projLength));
+
+                    // Radius = distance from sphere to axis
+                    const radialVec = new THREE.Vector3().subVectors(spherePos, axisPoint);
+                    const r = radialVec.length();
+
+                    if (r < 0.001) {
+                        // Sphere is on the axis, skip
+                        newSelection.add(selectedDomino);
+                        return;
+                    }
+
+                    // Calculate number of segments for ~1.0 spacing along the arc
+                    const arcLength = r * (Math.PI / 2); // 90 degrees
+                    const numSegments = Math.max(1, Math.round(arcLength));
+
+                    let currentParent = selectedDomino;
+                    let currentIndex = (selectedDomino.gradationIndex !== undefined) ? selectedDomino.gradationIndex : 0;
+                    const isGradation = document.getElementById('gradation-check').checked;
+                    const step = parseInt(document.getElementById('gradation-step').value, 10) || 10;
+
+                    // Turn Right = CCW (反時計回り) when viewed from above (red=up)
+                    // Positive angle around axisDir = CCW when looking down the axis
+                    for (let i = 1; i <= numSegments; i++) {
+                        const angle = (i / numSegments) * (Math.PI / 2); // 0 to 90 degrees, positive = CCW
+
+                        // Rotate radialVec around axis
+                        const rotatedVec = radialVec.clone().applyAxisAngle(axisDir, angle);
+                        const newPos = axisPoint.clone().add(rotatedVec);
+
+                        // Rotate orientation
+                        const rotQuat = new THREE.Quaternion().setFromAxisAngle(axisDir, angle);
+                        const newQuat = rotQuat.clone().multiply(selectedDomino.group.quaternion).normalize();
+
+                        currentIndex++;
+                        const color = isGradation ? getGradationColor(currentIndex, step) : null;
+                        const newDomino = createFullyOrientedDomino(newPos, newQuat, color, currentParent);
+                        newDomino.gradationIndex = currentIndex;
+                        newDomino.depth = currentParent.depth + 1;
+
+                        dominoes.push(newDomino);
+                        createdDominoes.push(newDomino);
+
+                        currentParent.children.push(newDomino);
+                        newDomino.parent = currentParent;
+                        currentParent = newDomino;
+                    }
+                    newSelection.add(currentParent);
+                });
+
+                selectedDominoes.clear();
+                newSelection.forEach(d => selectedDominoes.add(d));
+                if (selectedDominoes.size > 0) {
+                    activeDomino = Array.from(selectedDominoes).pop();
+                } else {
+                    activeDomino = null;
+                }
+
+                updateHighlights();
+                recordUndo('creation', createdDominoes, previousSelection);
+                logAction(`Turned Right (Axis Rotation)`);
+                updateGlobalStats();
+                return;
+            }
 
             const newSelection = new Set();
             const previousSelection = new Set(selectedDominoes);
