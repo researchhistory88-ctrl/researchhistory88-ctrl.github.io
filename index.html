@@ -580,7 +580,8 @@
             <div>
                 <label for="geometry-select">Geometry:</label>
                 <select id="geometry-select" style="width: 100px;">
-                    <option value="standard" selected>Standard</option>
+                    <option value="sphere" selected>Sphere</option>
+                    <option value="standard">Domino</option>
                     <option value="rounded">Rounded</option>
                     <option value="circle">Circle</option>
                     <option value="diamond">Diamond</option>
@@ -2645,7 +2646,7 @@
 
             // Create mesh with appropriate geometry
             let meshGeo;
-            if (geometryType === 'standard') {
+            if (geometryType === 'sphere') {
                 meshGeo = new THREE.SphereGeometry(0.1, 32, 32);
             } else {
                 meshGeo = geometry;
@@ -2738,7 +2739,7 @@
 
             // Create mesh with appropriate geometry
             let meshGeo;
-            if (geometryType === 'standard') {
+            if (geometryType === 'sphere') {
                 meshGeo = new THREE.SphereGeometry(0.1, 32, 32);
             } else {
                 meshGeo = geometry;
@@ -3955,9 +3956,9 @@
                 if (domino.isSparking && !domino.exploded) {
                     // Check if this is a non-standard geometry that needs rotation animation
                     const geometryType = mesh.userData.geometryType || 'standard';
-                    const needsRotationAnim = geometryType !== 'standard';
-                    // Only Sphere (standard) geometry should have scale animation
-                    const needsScaleAnim = geometryType === 'standard';
+                    const needsRotationAnim = geometryType !== 'sphere';
+                    // Only Sphere geometry should have scale animation
+                    const needsScaleAnim = geometryType === 'sphere';
 
                     // Initialize spark state if not present
                     if (domino.sparkTime === 0) {
@@ -4387,7 +4388,12 @@
                     mesh.geometry.dispose();
 
                     // Create new geometry
-                    const newGeometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, selectedValue);
+                    let newGeometry;
+                    if (selectedValue === 'sphere') {
+                        newGeometry = new THREE.SphereGeometry(0.1, 32, 32);
+                    } else {
+                        newGeometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, selectedValue);
+                    }
                     mesh.geometry = newGeometry;
 
                     // Update geometryType so spark animation knows the correct type
@@ -6221,7 +6227,7 @@
                     const currentType = targetMesh.userData.geometryType || 'standard';
                     if (currentType !== rootData.geometryType) {
                         targetMesh.geometry.dispose();
-                        if (rootData.geometryType === 'standard') {
+                        if (rootData.geometryType === 'standard' || rootData.geometryType === 'sphere') {
                             targetMesh.geometry = new THREE.SphereGeometry(0.1, 32, 32);
                         } else {
                             targetMesh.geometry = createDominoGeometry(DOMINO_WIDTH, DOMINO_HEIGHT, DOMINO_DEPTH, rootData.geometryType);
