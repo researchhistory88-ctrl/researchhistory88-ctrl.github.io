@@ -431,6 +431,14 @@
                 <button id="select-all-btn" class="icon-btn" title="Select All">
                     <span class="material-icons">select_all</span>
                 </button>
+                <button id="select-longer-btn" class="icon-btn" title="Select Longer (extend selection)"
+                    style="color: #4CAF50;">
+                    <span class="material-icons">add_circle_outline</span>
+                </button>
+                <button id="select-shorter-btn" class="icon-btn" title="Select Shorter (shrink selection)"
+                    style="color: #f44336;">
+                    <span class="material-icons">remove_circle_outline</span>
+                </button>
                 <button id="select-previous-btn" class="icon-btn" title="Select Previous">
                     <span class="material-icons">restore</span>
                 </button>
@@ -509,10 +517,10 @@
                 });
             </script>
 
-            <!-- Turn mirroring / Spiral Orientation -->
+            <!-- Turn mirroring / Spiral Orientation / Select Direction -->
             <div>
                 <label for="spiral-direction" style="cursor: pointer; font-size: 13px;">Turn mirroring / Spiral
-                    Orientation</label>
+                    Orientation / Select Direction</label>
                 <select id="spiral-direction"
                     style="margin-left: 8px; width: 40px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 4px;">
                     <option value="-">-</option>
@@ -1130,6 +1138,83 @@
             }
         });
 
+        // Select Longer Logic
+        document.getElementById('select-longer-btn').addEventListener('click', () => {
+            if (selectedDominoes.size === 0) return;
+            recordSelectionHistory();
+            const direction = document.getElementById('spiral-direction').value;
+            const toAdd = [];
+
+            if (direction === '+') {
+                // Add children of selected spheres
+                selectedDominoes.forEach(d => {
+                    if (d.children) {
+                        d.children.forEach(child => {
+                            if (!selectedDominoes.has(child)) {
+                                toAdd.push(child);
+                            }
+                        });
+                    }
+                });
+            } else {
+                // Add parents of selected spheres
+                selectedDominoes.forEach(d => {
+                    if (d.parent && !selectedDominoes.has(d.parent)) {
+                        toAdd.push(d.parent);
+                    }
+                });
+            }
+
+            toAdd.forEach(d => selectedDominoes.add(d));
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            }
+            updateHighlights();
+            logAction(`Select Longer (${direction}): added ${toAdd.length} spheres`);
+            playClickSound();
+        });
+
+        // Select Shorter Logic
+        document.getElementById('select-shorter-btn').addEventListener('click', () => {
+            if (selectedDominoes.size === 0) return;
+            recordSelectionHistory();
+            const direction = document.getElementById('spiral-direction').value;
+            const toRemove = [];
+
+            if (direction === '+') {
+                // Remove spheres whose children are all unselected or who have no children
+                selectedDominoes.forEach(d => {
+                    if (!d.children || d.children.length === 0) {
+                        toRemove.push(d);
+                    } else {
+                        const hasSelectedChild = d.children.some(child => selectedDominoes.has(child));
+                        if (!hasSelectedChild) {
+                            toRemove.push(d);
+                        }
+                    }
+                });
+            } else {
+                // Remove spheres whose parent is unselected or who have no parent
+                selectedDominoes.forEach(d => {
+                    if (!d.parent) {
+                        toRemove.push(d);
+                    } else if (!selectedDominoes.has(d.parent)) {
+                        toRemove.push(d);
+                    }
+                });
+            }
+
+            toRemove.forEach(d => selectedDominoes.delete(d));
+            if (selectedDominoes.size > 0) {
+                activeDomino = Array.from(selectedDominoes).pop();
+            } else {
+                activeDomino = null;
+            }
+            updateHighlights();
+            logAction(`Select Shorter (${direction}): removed ${toRemove.length} spheres`);
+            playClickSound();
+        });
+
         // Select Edges Logic
         document.getElementById('select-edges-btn').addEventListener('click', () => {
             if (dominoes.length > 0) {
@@ -1670,24 +1755,15 @@
                     if (selectedDominoes.size > 0) {
                         selectedDominoes.forEach(domino => {
                             const mesh = domino.group.children[0];
-
-                            // Adjust position based on geometry type
+                            const factor = 2.0;
                             if (mesh.geometry.type === 'SphereGeometry') {
-                                // For sphere: Scale uniformly in all directions, Center remains unchanged
-                                const factor = 2.0;
                                 mesh.scale.x *= factor;
                                 mesh.scale.y *= factor;
                                 mesh.scale.z *= factor;
-                                // DO NOT change position.y
                             } else {
-                                // For box/shape: Scale planar dimensions, adjust position to stay on ground
-                                const factor = 2.0;
                                 mesh.scale.x *= factor;
                                 mesh.scale.y *= factor;
-                                // Do not scale Z (thickness) for flat shapes
-                                mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
                             }
-                            // Update baseScale for persistence in Exhibition mode
                             mesh.userData.baseScale = mesh.scale.clone();
                         });
                         logAction("Doubled Scale");
@@ -1697,19 +1773,15 @@
                     if (selectedDominoes.size > 0) {
                         selectedDominoes.forEach(domino => {
                             const mesh = domino.group.children[0];
-
+                            const factor = 1.19;
                             if (mesh.geometry.type === 'SphereGeometry') {
-                                const factor = 1.19;
                                 mesh.scale.x *= factor;
                                 mesh.scale.y *= factor;
                                 mesh.scale.z *= factor;
                             } else {
-                                const factor = 1.19;
                                 mesh.scale.x *= factor;
                                 mesh.scale.y *= factor;
-                                mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
                             }
-                            // Update baseScale for persistence
                             mesh.userData.baseScale = mesh.scale.clone();
                         });
                         logAction("Enlarged Scale");
@@ -1719,19 +1791,15 @@
                     if (selectedDominoes.size > 0) {
                         selectedDominoes.forEach(domino => {
                             const mesh = domino.group.children[0];
-
+                            const factor = 1.19;
                             if (mesh.geometry.type === 'SphereGeometry') {
-                                const factor = 1.19;
                                 mesh.scale.x /= factor;
                                 mesh.scale.y /= factor;
                                 mesh.scale.z /= factor;
                             } else {
-                                const factor = 1.19;
                                 mesh.scale.x /= factor;
                                 mesh.scale.y /= factor;
-                                mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
                             }
-                            // Update baseScale for persistence
                             mesh.userData.baseScale = mesh.scale.clone();
                         });
                         logAction("Reduced Scale");
@@ -1743,7 +1811,6 @@
                         sortedDominoes.forEach((domino, index) => {
                             const mesh = domino.group.children[0];
                             const scaleFactor = 1 + (index * 0.1);
-
                             if (mesh.geometry.type === 'SphereGeometry') {
                                 mesh.scale.x *= scaleFactor;
                                 mesh.scale.y *= scaleFactor;
@@ -1751,9 +1818,7 @@
                             } else {
                                 mesh.scale.x *= scaleFactor;
                                 mesh.scale.y *= scaleFactor;
-                                mesh.position.y = (DOMINO_HEIGHT * mesh.scale.y) / 2;
                             }
-                            // Update baseScale for persistence
                             mesh.userData.baseScale = mesh.scale.clone();
                         });
                         logAction("Group Enlarged Scale");
