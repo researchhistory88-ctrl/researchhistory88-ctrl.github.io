@@ -31,11 +31,11 @@
             padding-right: 130px;
         }
 
-        #start-btn {
+        #exhibition-btn {
             pointer-events: auto;
             padding: 12px 24px;
             font-size: 18px;
-            background: linear-gradient(135deg, #6e8efb, #a777e3);
+            background: linear-gradient(135deg, #9C27B0, #BA68C8);
             border: none;
             border-radius: 8px;
             color: white;
@@ -44,12 +44,12 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         }
 
-        #start-btn:hover {
+        #exhibition-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
         }
 
-        #start-btn:active {
+        #exhibition-btn:active {
             transform: translateY(0);
         }
 
@@ -130,10 +130,25 @@
             border-radius: 3px;
         }
 
-        #start-btn {
+        #exhibition-btn {
             grid-column: 1 / -1;
             /* Span full width */
             width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #exhibition-btn .material-icons {
+            font-size: 24px;
+        }
+
+        #spark-test-btn {
+            font-size: 11px;
+            /* Smaller font for "Spark Test" */
+            padding: 0 4px;
+            /* Tight padding */
+            white-space: nowrap;
         }
 
         /* Mobile Responsive UI - Using more specific selectors to ensure priority */
@@ -274,7 +289,7 @@
             /* Leave space for toggle buttons */
         }
 
-        body.mobile-mode #start-btn {
+        body.mobile-mode #exhibition-btn {
             height: 44px !important;
             font-size: 16px !important;
             grid-column: 1 / -1 !important;
@@ -386,7 +401,10 @@
     <!-- Left Panel -->
     <div id="left-panel">
         <div id="button-container">
-            <button id="start-btn">Spark Sphere</button>
+            <button id="exhibition-btn" class="main-action-btn" title="Exhibition Mode"
+                style="background: #9C27B0; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s;">
+                <span class="material-icons">visibility</span>
+            </button>
             <div style="grid-column: 1 / -1; display: flex; gap: 5px; flex-wrap: wrap;">
                 <button id="tree-view-btn" class="icon-btn" title="Tree View" style="color: #607D8B;">
                     <span class="material-icons">account_tree</span>
@@ -394,8 +412,9 @@
                 <button id="undo-btn" class="icon-btn" title="Undo" style="color: #909090;">
                     <span class="material-icons">undo</span>
                 </button>
-                <button id="exhibition-btn" class="icon-btn" title="Exhibition Mode" style="color: #9C27B0;">
-                    <span class="material-icons">visibility</span>
+                <button id="spark-test-btn" class="icon-btn" title="Spark Test"
+                    style="width: auto; padding: 0 8px; color: #4CAF50;">
+                    Spark Test
                 </button>
                 <button id="orientation-btn" class="icon-btn" title="Orientation Edit" style="color: #E91E63;">
                     <span class="material-icons">screen_rotation</span>
@@ -733,7 +752,8 @@
                 width: 100%;
                 margin-top: 5px;
             ">Step All</button>
-            <div id="replay-status" style="font-size: 12px; color: #666; text-align: center; margin-top: 5px;"></div>
+            <div id="replay-status" style="font-size: 12px; color: #666; text-align: center; margin-top: 5px;">
+            </div>
         </div>
         <div id="log-content" style="overflow-y: auto; flex: 1; min-height: 0; margin-top: 10px;"></div>
     </div>
@@ -1670,7 +1690,7 @@
                     document.getElementById('speed-slider').dispatchEvent(new Event('input'));
                     break;
                 case 'startAnimation':
-                    document.getElementById('start-btn').click();
+                    document.getElementById('spark-test-btn').click();
                     break;
                 case 'resetAnimation':
                     // Reset all
@@ -4229,7 +4249,7 @@
         }
 
         // --- Interaction ---
-        document.getElementById('start-btn').addEventListener('click', () => {
+        document.getElementById('spark-test-btn').addEventListener('click', () => {
             // Resume Audio Context on user interaction
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
