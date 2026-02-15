@@ -28,6 +28,7 @@
             pointer-events: none;
             color: white;
             z-index: 1000;
+            padding-right: 130px;
         }
 
         #start-btn {
@@ -827,10 +828,6 @@
                 // Iterate over children to get text content cleanly
                 for (const child of logContent.children) {
                     const textContent = child.innerText;
-                    // Filter out Animation events
-                    if (textContent.includes("Animation Started") || textContent.includes("Animation Reset")) {
-                        continue;
-                    }
                     text += textContent + "\n";
                 }
 
@@ -902,12 +899,22 @@
                 // Remove timestamp [HH:MM:SS]
                 const message = line.replace(/^\[.*?\]\s*/, '').trim();
 
-                if (message.startsWith("Added 2 Spheres")) {
-                    const match = message.match(/\((.*?)\)/);
-                    const direction = match ? match[1].toLowerCase() : 'straight';
-                    replayQueue.push({ type: 'addSpheresDirectional', direction: direction });
+                if (message.startsWith("Added Spheres along Bezier Curve")) {
+                    replayQueue.push({ type: 'addBezier' });
+                } else if (message.startsWith("Added Spheres to Special Sphere")) {
+                    replayQueue.push({ type: 'addSpecialSphere' });
+                } else if (message.startsWith("Added 2 Spheres") || message.startsWith("Added Spheres")) {
+                    const dirMatch = message.match(/\((.*?)\)/);
+                    const direction = dirMatch ? dirMatch[1].toLowerCase() : 'straight';
+                    const branchMatch = message.match(/x\s*(\d+)/);
+                    const branch = branchMatch ? parseInt(branchMatch[1], 10) : 1;
+                    replayQueue.push({ type: 'addSpheresDirectional', direction: direction, branch: branch });
                 } else if (message === "Added Domino" || message === "Added Sphere") {
-                    replayQueue.push({ type: 'addSpheresDirectional', direction: 'straight' });
+                    replayQueue.push({ type: 'addSpheresDirectional', direction: 'straight', branch: 1 });
+                } else if (message === "Turned Left (Axis Rotation)") {
+                    replayQueue.push({ type: 'turnLeftAxis' });
+                } else if (message === "Turned Right (Axis Rotation)") {
+                    replayQueue.push({ type: 'turnRightAxis' });
                 } else if (message.startsWith("Turned Left")) {
                     const radiusMatch = message.match(/Radius: (\d+)/);
                     const branchMatch = message.match(/Branch: (\d+)/);
@@ -975,6 +982,10 @@
                     replayQueue.push({ type: 'doubleScale' });
                 } else if (message.startsWith("Enlarged Scale")) {
                     replayQueue.push({ type: 'enlargeScale' });
+                } else if (message.startsWith("Reduced Scale")) {
+                    replayQueue.push({ type: 'reduceScale' });
+                } else if (message.startsWith("Group Enlarged Scale")) {
+                    replayQueue.push({ type: 'groupEnlargeScale' });
                 } else if (message.startsWith("Go Up")) {
                     const radiusMatch = message.match(/Radius: (\d+)/);
                     const branchMatch = message.match(/Branch: (\d+)/);
@@ -1052,6 +1063,28 @@
                 } else if (message.startsWith("Up/Down Offset:")) {
                     const offset = parseFloat(message.split(': ')[1]);
                     replayQueue.push({ type: 'setUpDownOffset', offset: offset });
+                } else if (message.startsWith("Deleted") && message.includes("Spheres")) {
+                    replayQueue.push({ type: 'delete' });
+                } else if (message === "Surfaces: ON" || message === "Surfaces: OFF") {
+                    replayQueue.push({ type: 'toggleSurfaces', enabled: message === "Surfaces: ON" });
+                } else if (message.startsWith("Sparking Started")) {
+                    replayQueue.push({ type: 'startAnimation' });
+                } else if (message.startsWith("Select Longer")) {
+                    const dirMatch = message.match(/Select Longer \((.*?)\)/);
+                    const direction = dirMatch ? dirMatch[1] : 'forward';
+                    replayQueue.push({ type: 'selectLonger', direction: direction });
+                } else if (message.startsWith("Select Shorter")) {
+                    const dirMatch = message.match(/Select Shorter \((.*?)\)/);
+                    const direction = dirMatch ? dirMatch[1] : 'forward';
+                    replayQueue.push({ type: 'selectShorter', direction: direction });
+                } else if (message === "Restored Previous Selection") {
+                    replayQueue.push({ type: 'selectPrevious' });
+                } else if (message === "Special Sphere Hidden" || message === "Special Sphere Shown and Selected") {
+                    replayQueue.push({ type: 'toggleSpecialSphere' });
+                } else if (message === "Blue Special Sphere Hidden" || message === "Blue Special Sphere Shown and Selected") {
+                    replayQueue.push({ type: 'toggleBlueSpecialSphere' });
+                } else if (message === "Yellow Special Sphere Hidden" || message === "Yellow Special Sphere Shown and Selected") {
+                    replayQueue.push({ type: 'toggleYellowSpecialSphere' });
                 }
             });
 
@@ -1560,7 +1593,22 @@
         function executeCommand(cmd) {
             switch (cmd.type) {
                 case 'addSpheresDirectional':
+                    if (cmd.branch && cmd.branch > 1) {
+                        document.getElementById('branch-select').value = cmd.branch;
+                    }
                     addSpheresDirectional(cmd.direction);
+                    break;
+                case 'addBezier':
+                    addSpheresDirectional('straight');
+                    break;
+                case 'addSpecialSphere':
+                    addSpheresDirectional('straight');
+                    break;
+                case 'turnLeftAxis':
+                    turnLeft();
+                    break;
+                case 'turnRightAxis':
+                    turnRight();
                     break;
                 case 'addDomino':
                     addSpheresDirectional('straight');
@@ -1853,6 +1901,9 @@
                         document.getElementById('spiral-direction').value = cmd.direction;
                     }
                     break;
+                case 'setSpiralDirection':
+                    document.getElementById('spiral-direction').value = cmd.direction;
+                    break;
                 case 'setMultiSelectMode':
                     document.getElementById('multi-select-check').checked = cmd.enabled;
                     break;
@@ -1867,6 +1918,29 @@
                     break;
                 case 'delete':
                     deleteSelected();
+                    break;
+                case 'toggleSurfaces':
+                    if (surfacesVisible !== cmd.enabled) {
+                        document.getElementById('toggle-surface-btn').click();
+                    }
+                    break;
+                case 'selectLonger':
+                    document.getElementById('select-longer-btn').click();
+                    break;
+                case 'selectShorter':
+                    document.getElementById('select-shorter-btn').click();
+                    break;
+                case 'selectPrevious':
+                    document.getElementById('select-previous-btn').click();
+                    break;
+                case 'toggleSpecialSphere':
+                    document.getElementById('special-sphere-btn').click();
+                    break;
+                case 'toggleBlueSpecialSphere':
+                    document.getElementById('special-sphere-blue-btn').click();
+                    break;
+                case 'toggleYellowSpecialSphere':
+                    document.getElementById('special-sphere-yellow-btn').click();
                     break;
             }
             lastReplayCommandType = cmd.type; // Track for next command's selection behavior
