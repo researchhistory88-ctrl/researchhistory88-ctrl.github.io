@@ -5661,10 +5661,14 @@
 
             const createdDominoes = [];
             const previousSelection = new Set(selectedDominoes);
+            const nextSelection = new Set();
 
             selectedDominoes.forEach(d => {
                 // Skip Loop/Root or objects without parent
                 if (!d.parent) return;
+
+                // Add original to new selection
+                nextSelection.add(d);
 
                 // 1. Determine Rotation Axis (Vector from Parent to Child)
                 const parentPos = d.parent.group.position;
@@ -5716,10 +5720,21 @@
                     dominoes.push(newDomino);
                     createdDominoes.push(newDomino);
                     d.parent.children.push(newDomino);
+
+                    // Add copy to new selection
+                    nextSelection.add(newDomino);
                 }
             });
 
             if (createdDominoes.length > 0) {
+                // Update Selection
+                selectedDominoes.clear();
+                nextSelection.forEach(item => selectedDominoes.add(item));
+
+                // Update active domino to one of the new ones
+                activeDomino = createdDominoes[createdDominoes.length - 1];
+
+                updateHighlights();
                 recordUndo('creation', createdDominoes, previousSelection);
                 logAction(`Multiplexing: Created ${createdDominoes.length} siblings (x${n})`);
                 updateGlobalStats();
