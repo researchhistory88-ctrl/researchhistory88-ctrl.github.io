@@ -1104,6 +1104,18 @@
                     replayQueue.push({ type: 'toggleBlueSpecialSphere' });
                 } else if (message === "Yellow Special Sphere Hidden" || message === "Yellow Special Sphere Shown and Selected") {
                     replayQueue.push({ type: 'toggleYellowSpecialSphere' });
+                } else if (message.startsWith("Rotated Selection (Delta):")) {
+                    const parts = message.replace("Rotated Selection (Delta):", "").trim().split(',');
+                    if (parts.length === 4) {
+                        const x = parseFloat(parts[0]);
+                        const y = parseFloat(parts[1]);
+                        const z = parseFloat(parts[2]);
+                        const w = parseFloat(parts[3]);
+                        replayQueue.push({
+                            type: 'rotateSelection',
+                            quaternion: { x, y, z, w }
+                        });
+                    }
                 }
             });
 
@@ -1687,6 +1699,16 @@
                 case 'setSpeed':
                     document.getElementById('speed-slider').value = cmd.speed;
                     document.getElementById('speed-slider').dispatchEvent(new Event('input'));
+                    break;
+                case 'rotateSelection':
+                    if (selectedDominoes.size > 0) {
+                        const q = new THREE.Quaternion(cmd.quaternion.x, cmd.quaternion.y, cmd.quaternion.z, cmd.quaternion.w);
+                        selectedDominoes.forEach(d => {
+                            d.group.quaternion.multiply(q);
+                        });
+                        updateHighlights();
+                        // No need to log action during replay
+                    }
                     break;
                 case 'startAnimation':
                     document.getElementById('spark-test-btn').click();
@@ -2438,6 +2460,18 @@
             } else {
                 // Drag ended: hide rotation display and clear stored quaternions
                 rotationDisplay.style.display = 'none';
+
+                // Calculate and log the final rotation delta
+                if (activeDomino && selectedDominoes.has(activeDomino)) {
+                    // Similar logic to the 'change' event to calculate the local delta
+                    // but here we just want to log what happened during the whole drag operation.
+                    const currentActiveQuat = activeDomino.group.quaternion.clone();
+                    const inverseInitialActive = initialActiveQuaternion.clone().invert();
+                    const localDeltaQuaternion = inverseInitialActive.multiply(currentActiveQuat);
+
+                    logAction(`Rotated Selection (Delta): ${localDeltaQuaternion.x}, ${localDeltaQuaternion.y}, ${localDeltaQuaternion.z}, ${localDeltaQuaternion.w}`);
+                }
+
                 initialDominoQuaternions.clear();
             }
         });
@@ -5618,25 +5652,116 @@
             playClickSound();
         }, '#aaffae', '#dfffdf', "Move Down n");
 
+        createButton("dynamic_feed", () => {
+            const n = parseInt(document.getElementById('branch-select').value);
+            if (n < 2) {
+                logAction("Multiplexing: Branch value must be >= 2");
+                return;
+            }
+
+            const createdDominoes = [];
+            const previousSelection = new Set(selectedDominoes);
+
+            selectedDominoes.forEach(d => {
+                // Skip Loop/Root or objects without parent
+                if (!d.parent) return;
+
+                // 1. Determine Rotation Axis (Vector from Parent to Child)
+                const parentPos = d.parent.group.position;
+                const childPos = d.group.position;
+                const axis = new THREE.Vector3().subVectors(childPos, parentPos).normalize();
+
+                // Fallback for coincident positions (should not happen in tree, but safety first)
+                if (axis.lengthSq() < 0.001) axis.set(0, 1, 0);
+
+                // 2. Create N-1 Copies
+                for (let i = 1; i < n; i++) {
+                    const angle = (i * 2 * Math.PI) / n;
+                    const rotQuat = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+
+                    // New Orientation: Rotate the original orientation logic around the axis
+                    // We want the object ITSELF to be rotated around the parent-child axis.
+                    // Since it's at the same position, we just rotate its orientation.
+                    // But effectively, if we "grew" it, it would grow in a different spiral arm.
+                    const newQuat = rotQuat.clone().multiply(d.group.quaternion);
+
+                    // Get Color
+                    let color = null;
+                    const mesh = d.group.children[0];
+                    if (mesh && mesh.material) {
+                        const mat = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+                        if (mat && mat.color) color = mat.color.getHex();
+                    }
+
+                    // Create Domino
+                    const geometryType = d.group.children[0].userData.geometryType || null;
+                    const newDomino = createFullyOrientedDomino(
+                        childPos.clone(),
+                        newQuat,
+                        color,
+                        d.parent, // Sibling
+                        geometryType // Override Geometry Type
+                    );
+
+                    // Copy Properties
+                    newDomino.depth = d.depth;
+                    if (d.gradationIndex !== undefined) newDomino.gradationIndex = d.gradationIndex;
+
+                    // Copy Scale
+                    if (mesh) {
+                        newDomino.group.children[0].scale.copy(mesh.scale);
+                    }
+
+                    // Register
+                    dominoes.push(newDomino);
+                    createdDominoes.push(newDomino);
+                    d.parent.children.push(newDomino);
+                }
+            });
+
+            if (createdDominoes.length > 0) {
+                recordUndo('creation', createdDominoes, previousSelection);
+                logAction(`Multiplexing: Created ${createdDominoes.length} siblings (x${n})`);
+                updateGlobalStats();
+                playClickSound();
+            } else {
+                logAction("Multiplexing: No valid objects selected (Root cannot be multiplexed)");
+            }
+
+        }, '#ff9f43', '#ffc048', "Multiplexing");
+
         // --- Connection Lines Feature ---
         let connectionLinesVisible = false;
-        let connectionLines = []; // Stores { line, parent, child } objects
+        let connectionLines = [];
+        let globalConnectionLineGeometry = null;
 
         function updateConnectionLines() {
             // Remove existing lines
             connectionLines.forEach(item => {
                 scene.remove(item.line);
-                item.line.geometry.dispose();
+                // Do NOT dispose geometry here if reusing the global one
+                // item.line.geometry.dispose(); 
                 if (item.line.material) item.line.material.dispose();
             });
             connectionLines = [];
 
             if (!connectionLinesVisible) return;
 
+            // Initialize global geometry once (Unit Cylinder: Radius 1, Height 1)
+            // Height 1 allows easy scaling by distance. Radius 1 allows scaling by desired radius.
+            if (!globalConnectionLineGeometry) {
+                globalConnectionLineGeometry = new THREE.CylinderGeometry(1, 1, 1, 8, 1, true);
+                // Cylinder default is Y-aligned, centered at origin.
+                // We rotate geometry to point along +Z for easier lookAt, OR keep Y and use quaternion unit vectors.
+                // Standard lookAt uses Z. Cylinder is Y.
+                // Let's Rotate geometry PI/2 around X to align with Z?
+                // Actually, let's keep it Y-aligned and use setFromUnitVectors(up, direction).
+                // Default Y-alignment is fine.
+            }
+
             // Create lines for each parent-child relationship
             dominoes.forEach(domino => {
                 if (domino.children && domino.children.length > 0) {
-                    const parentPos = domino.group.position;
 
                     // Get parent sphere color
                     let parentColor = 0x1edb06; // Default green
@@ -5648,23 +5773,27 @@
                         }
                     }
 
-                    const lineMaterial = new THREE.LineBasicMaterial({
+                    const cylinderMaterial = new THREE.MeshStandardMaterial({
                         color: parentColor,
-                        linewidth: 2,
+                        roughness: 0.5,
+                        metalness: 0.1,
                         transparent: true,
                         opacity: 0.8
                     });
 
                     domino.children.forEach(child => {
-                        const childPos = child.group.position;
-                        const points = [parentPos.clone(), childPos.clone()];
-                        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-                        const line = new THREE.Line(geometry, lineMaterial.clone());
-                        scene.add(line);
-                        connectionLines.push({ line, parent: domino, child });
+                        // Create Mesh instead of Line
+                        const mesh = new THREE.Mesh(globalConnectionLineGeometry, cylinderMaterial.clone());
+                        // Initial position/scale will be set by updateConnectionLinesPositions immediately
+                        // But we must add to scene
+                        scene.add(mesh);
+                        connectionLines.push({ line: mesh, parent: domino, child });
                     });
                 }
             });
+
+            // Force an initial update of positions
+            updateConnectionLinesPositions();
         }
 
         // Hide all connection lines (for Spark Sphere start)
@@ -5694,19 +5823,48 @@
         function updateConnectionLinesPositions() {
             if (!connectionLinesVisible || connectionLines.length === 0) return;
 
+            const upVec = new THREE.Vector3(0, 1, 0); // Cylinder geometry is Y-aligned
+
             connectionLines.forEach(item => {
-                const positions = item.line.geometry.attributes.position.array;
                 const parentPos = item.parent.group.position;
                 const childPos = item.child.group.position;
 
-                positions[0] = parentPos.x;
-                positions[1] = parentPos.y;
-                positions[2] = parentPos.z;
-                positions[3] = childPos.x;
-                positions[4] = childPos.y;
-                positions[5] = childPos.z;
+                // 1. Calculate Midpoint
+                const midpoint = new THREE.Vector3().addVectors(parentPos, childPos).multiplyScalar(0.5);
+                item.line.position.copy(midpoint);
 
-                item.line.geometry.attributes.position.needsUpdate = true;
+                // 2. Calculate Distance (Scale Y)
+                const distance = parentPos.distanceTo(childPos);
+
+                // 3. Calculate Thickness (Scale based on sphere radius)
+                const parentMesh = item.parent.group.children[0];
+                const scaleX = parentMesh.scale.x;
+
+                // Sphere Geometry is created with Radius 0.1 (diameter 0.2) in createFullyOrientedDomino
+                // Unit Cylinder has Radius 1 (diameter 2).
+                // To match Sphere Diameter:
+                // Cylinder Diameter (2 * Scale) = Sphere Diameter (0.2 * ScaleX)
+                // Scale = 0.1 * ScaleX.
+
+                // Set Scale Factor to 0.1.
+                const baseRadius = 0.1;
+                const radius = baseRadius * scaleX;
+
+                item.line.scale.set(radius, distance, radius);
+
+                // CHECK: line 4522 `newGeometry = new THREE.SphereGeometry(0.1, 32, 32);`
+                // CHECK line 2289 `const sphereGeo = new THREE.SphereGeometry(0.15, 32, 32);` 
+                // It seems 0.15 is the standard base.
+                // const baseRadius = 0.15;
+                // const radius = baseRadius * scaleX;
+
+                item.line.scale.set(radius, distance, radius);
+
+                // 4. Orientation
+                const direction = new THREE.Vector3().subVectors(childPos, parentPos).normalize();
+                if (direction.lengthSq() > 0) {
+                    item.line.quaternion.setFromUnitVectors(upVec, direction);
+                }
             });
         }
 
