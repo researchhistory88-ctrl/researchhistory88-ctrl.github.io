@@ -902,10 +902,56 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 const text = e.target.result;
+                clearScene(); // Reset state before replay
                 parseLog(text);
             };
             reader.readAsText(file);
         });
+
+        function clearScene() {
+            // Remove all dominoes
+            dominoes.forEach(d => {
+                if (d.group) scene.remove(d.group);
+            });
+            dominoes = [];
+            selectedDominoes.clear();
+            activeDomino = null;
+
+            // Reset ID counter to ensure replay IDs match logged IDs
+            dominoIdCounter = 0;
+
+            // Clear connection lines
+            if (typeof connectionLines !== 'undefined') {
+                connectionLines.forEach(item => {
+                    scene.remove(item.line);
+                    if (item.line.geometry) item.line.geometry.dispose();
+                    if (item.line.material) item.line.material.dispose();
+                });
+                connectionLines = [];
+            }
+
+            // Reset Special Spheres to hidden by clicking if active
+            if (typeof specialSphereVisible !== 'undefined' && specialSphereVisible) {
+                document.getElementById('special-sphere-btn').click();
+            }
+            if (typeof specialSphereBlueVisible !== 'undefined' && specialSphereBlueVisible) {
+                document.getElementById('special-sphere-blue-btn').click();
+            }
+            if (typeof specialSphereYellowVisible !== 'undefined' && specialSphereYellowVisible) {
+                document.getElementById('special-sphere-yellow-btn').click();
+            }
+
+            // Clear Replay Queue
+            replayQueue = [];
+            currentReplayIndex = 0;
+
+            // Clear Log UI
+            const logContent = document.getElementById('log-content');
+            if (logContent) logContent.innerHTML = '';
+
+            updateHighlights();
+            updateGlobalStats();
+        }
 
         function parseLog(text, silent = false) {
             replayQueue = [];
@@ -1129,6 +1175,16 @@
                             quaternion: { x, y, z, w }
                         });
                     }
+                } else if (message.match(/Multiplexing: .* \(x(\d+)\)/)) {
+                    const match = message.match(/Multiplexing: .* \(x(\d+)\)/);
+                    if (match) {
+                        const n = parseInt(match[1], 10);
+                        replayQueue.push({ type: 'multiplex', n: n });
+                    }
+                } else if (message.startsWith("Copied subtree")) {
+                    replayQueue.push({ type: 'copy' });
+                } else if (message.startsWith("Pasted subtree") || message.startsWith("Updated") && message.includes("to match copied root")) {
+                    replayQueue.push({ type: 'paste' });
                 }
             });
 
@@ -1647,6 +1703,15 @@
                     break;
                 case 'addSpecialSphere':
                     addSpheresDirectional('straight');
+                    break;
+                case 'multiplex':
+                    performMultiplexing(cmd.n);
+                    break;
+                case 'copy':
+                    copySelectedSubtree();
+                    break;
+                case 'paste':
+                    pasteSubtree();
                     break;
                 case 'moveSpecialSphere':
                     const dist = cmd.distance;
@@ -5685,8 +5750,7 @@
             playClickSound();
         }, '#aaffae', '#dfffdf', "Move Down n");
 
-        createButton("dynamic_feed", () => {
-            const n = parseInt(document.getElementById('branch-select').value);
+        function performMultiplexing(n) {
             if (n < 2) {
                 logAction("Multiplexing: Branch value must be >= 2");
                 return;
@@ -5775,7 +5839,11 @@
             } else {
                 logAction("Multiplexing: No valid objects selected (Root cannot be multiplexed)");
             }
+        }
 
+        createButton("dynamic_feed", () => {
+            const n = parseInt(document.getElementById('branch-select').value);
+            performMultiplexing(n);
         }, '#ff9f43', '#ffc048', "Multiplexing");
 
         // --- Connection Lines Feature ---
