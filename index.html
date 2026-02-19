@@ -1104,6 +1104,19 @@
                     replayQueue.push({ type: 'toggleBlueSpecialSphere' });
                 } else if (message === "Yellow Special Sphere Hidden" || message === "Yellow Special Sphere Shown and Selected") {
                     replayQueue.push({ type: 'toggleYellowSpecialSphere' });
+                } else if (message.includes("Special Sphere Moved")) {
+                    const match = message.match(/(Red|Blue|Yellow) Special Sphere Moved (Left|Right|Forward|Backward|Up|Down) (\d+)/);
+                    if (match) {
+                        const sphereColor = match[1].toLowerCase();
+                        const direction = match[2].toLowerCase();
+                        const distance = parseInt(match[3], 10);
+                        replayQueue.push({
+                            type: 'moveSpecialSphere',
+                            sphere: sphereColor,
+                            direction: direction,
+                            distance: distance
+                        });
+                    }
                 } else if (message.startsWith("Rotated Selection (Delta):")) {
                     const parts = message.replace("Rotated Selection (Delta):", "").trim().split(',');
                     if (parts.length === 4) {
@@ -1634,6 +1647,26 @@
                     break;
                 case 'addSpecialSphere':
                     addSpheresDirectional('straight');
+                    break;
+                case 'moveSpecialSphere':
+                    const dist = cmd.distance;
+                    let targetSphere = null;
+
+                    if (cmd.sphere === 'red') targetSphere = specialSphere;
+                    else if (cmd.sphere === 'blue') targetSphere = specialSphereBlue;
+                    else if (cmd.sphere === 'yellow') targetSphere = specialSphereYellow;
+
+                    if (targetSphere) {
+                        switch (cmd.direction) {
+                            case 'left': targetSphere.translateX(dist); break;
+                            case 'right': targetSphere.translateX(-dist); break;
+                            case 'forward': targetSphere.translateZ(dist); break;
+                            case 'backward': targetSphere.translateZ(-dist); break;
+                            case 'up': targetSphere.translateY(dist); break;
+                            case 'down': targetSphere.translateY(-dist); break;
+                        }
+                        updateHighlights();
+                    }
                     break;
                 case 'turnLeftAxis':
                     turnLeft();
