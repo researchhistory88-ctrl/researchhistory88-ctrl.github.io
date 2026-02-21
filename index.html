@@ -913,7 +913,7 @@
             dominoes.forEach(d => {
                 if (d.group) scene.remove(d.group);
             });
-            dominoes = [];
+            dominoes.length = 0;
             selectedDominoes.clear();
             activeDomino = null;
 
@@ -948,6 +948,15 @@
             // Clear Log UI
             const logContent = document.getElementById('log-content');
             if (logContent) logContent.innerHTML = '';
+
+            // Recreate the initial sphere (mirrors page-load init at line ~3337)
+            const initialDomino = createDomino(0, 0xffffff);
+            initialDomino.depth = 1;
+            if (!dominoes.includes(initialDomino)) {
+                dominoes.push(initialDomino);
+            }
+            activeDomino = initialDomino;
+            selectedDominoes.add(initialDomino);
 
             updateHighlights();
             updateGlobalStats();
